@@ -244,6 +244,11 @@
         color: var(--accent-ink);
     }
 
+    .nav-pill[aria-current='true']:hover {
+        background: var(--accent);
+        color: var(--accent-ink);
+    }
+
     .field {
         width: 100%;
         background: var(--surface-2);

@@ -6,6 +6,10 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="GridOptima reads campus operator notes with a language model, validates them behind deterministic guardrails and returns a provably cost-optimal 24-hour energy schedule.">
     <title>GridOptima — Smarter Energy, Optimized for Every Hour</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/icon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="/icon-180.png">
+    <meta name="theme-color" content="#2a60d8">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen font-sans">
@@ -105,7 +109,7 @@
 
             <div class="hidden flex-col gap-7" id="output">
 
-                <div class="card overflow-hidden" id="overview">
+                <div class="card scroll-mt-24 overflow-hidden" id="overview">
                     <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.45fr)]">
                         <div class="p-8">
                             <p class="eyebrow">Total grid electricity cost</p>
@@ -121,7 +125,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-7 2xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]" id="interpretation">
+                <div class="grid scroll-mt-24 grid-cols-1 gap-7 2xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]" id="interpretation">
                     <div class="card">
                         <div class="card-head">
                             <span class="card-title">Directive interpretation</span>
@@ -142,7 +146,7 @@
                     </div>
                 </div>
 
-                <div class="card" id="plan">
+                <div class="card scroll-mt-24" id="plan">
                     <div class="card-head flex-wrap">
                         <div class="flex flex-wrap items-center gap-4">
                             <span class="card-title">24-hour plan</span>
@@ -184,7 +188,7 @@
                     </div>
                 </div>
 
-                <div class="grid grid-cols-1 gap-7 2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]" id="verification">
+                <div class="grid scroll-mt-24 grid-cols-1 gap-7 2xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]" id="verification">
                     <div class="card">
                         <div class="card-head">
                             <span class="card-title">Battery state of charge</span>
