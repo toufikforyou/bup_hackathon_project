@@ -519,6 +519,10 @@ the WCAG-clean twin** so no value is reachable only by hovering.
 renders on: the three stacked series clear the lightness, chroma, colour-vision-deficiency and normal-vision gates, and
 the sub-3:1 contrast warning on two of them is answered by the always-available table view.
 
+**Visual language.** Flat surfaces, one hairline border per card and almost no shadow. Nothing is boxed inside a box:
+lists of directives, replay checks and supply-mix rows are separated by hairlines rather than nested panels, so the
+data is the only thing carrying weight.
+
 **Overview.** One card carries the hero figure and three supporting metrics separated by hairlines, each with a thin
 linear meter rather than a boxed gauge: cost avoided against a full-grid-supply baseline, solar captured against what
 was actually available, and pipeline time against the 5 s scoring budget, whose meter shifts from accent to warning to

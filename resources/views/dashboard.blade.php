@@ -61,7 +61,7 @@
                     <span class="card-title">Scenario</span>
                     <span class="text-[11.5px]" style="color: var(--text-muted)" id="sample-count"></span>
                 </div>
-                <div class="scroll-thin max-h-72 space-y-1.5 overflow-y-auto p-3" id="sample-list" role="group" aria-label="Public sample scenarios"></div>
+                <div class="scroll-thin max-h-72 space-y-1 overflow-y-auto p-3" id="sample-list" role="group" aria-label="Public sample scenarios"></div>
             </section>
 
             <section class="card">
@@ -127,7 +127,7 @@
                             <span class="card-title">Directive interpretation</span>
                             <span class="chip" id="interpretation-source"></span>
                         </div>
-                        <div class="space-y-3.5 p-4" id="directives"></div>
+                        <div class="divided" id="directives"></div>
                     </div>
 
                     <div class="card">
@@ -135,9 +135,9 @@
                             <span class="card-title">Supply mix</span>
                             <span class="text-[11.5px]" style="color: var(--text-muted)" id="mix-total"></span>
                         </div>
-                        <div class="p-5">
+                        <div class="px-6 py-5">
                             <div class="mix-bar" id="mix-bar"></div>
-                            <div class="mt-4" id="mix-rows"></div>
+                            <div class="mt-5" id="mix-rows"></div>
                         </div>
                     </div>
                 </div>
@@ -198,7 +198,7 @@
                             <span class="card-title">Replay verification</span>
                             <span class="badge" id="replay-badge"></span>
                         </div>
-                        <div class="p-5" id="replay"></div>
+                        <div class="px-6 py-3" id="replay"></div>
                     </div>
                 </div>
 
