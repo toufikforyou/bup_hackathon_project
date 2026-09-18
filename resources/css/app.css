@@ -551,7 +551,7 @@
 
 
     .metric {
-        padding: 1.5rem 1.5rem 1.625rem;
+        padding: 1.5rem 1.25rem 1.75rem;
     }
 
     .metric + .metric {
@@ -580,17 +580,13 @@
         color: var(--text-muted);
     }
 
-    .meter {
-        height: 4px;
-        border-radius: 999px;
-        overflow: hidden;
+    .gauge {
+        display: flex;
+        justify-content: center;
     }
 
-    .meter > span {
-        display: block;
-        height: 100%;
-        border-radius: 999px;
-        transition: width 0.85s cubic-bezier(0.2, 0.8, 0.3, 1);
+    .gauge svg {
+        max-width: 11rem;
     }
 
     .slider-row {

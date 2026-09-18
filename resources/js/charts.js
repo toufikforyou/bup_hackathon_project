@@ -600,3 +600,75 @@ export function createTooltip() {
 }
 
 export const SERIES_META = SERIES;
+
+function polar(cx, cy, r, degrees) {
+    const rad = (degrees * Math.PI) / 180;
+
+    return [cx + r * Math.cos(rad), cy - r * Math.sin(rad)];
+}
+
+function arcPath(cx, cy, r, startDeg, endDeg) {
+    const [x1, y1] = polar(cx, cy, r, startDeg);
+    const [x2, y2] = polar(cx, cy, r, endDeg);
+
+    return `M${x1},${y1} A${r},${r} 0 ${Math.abs(endDeg - startDeg) > 180 ? 1 : 0} 1 ${x2},${y2}`;
+}
+
+export function renderGauge(container, { ratio, color, valueText }) {
+    container.replaceChildren();
+
+    const width = 168;
+    const height = 100;
+    const stroke = 17;
+    const cx = width / 2;
+    const cy = height - 12;
+    const r = (width - stroke) / 2 - 2;
+    const clamped = Math.max(0, Math.min(1, ratio));
+
+    const root = svg(width, height);
+    root.setAttribute('aria-hidden', 'true');
+
+    root.appendChild(el('path', {
+        d: arcPath(cx, cy, r, 180, 0),
+        fill: 'none',
+        stroke: color,
+        'stroke-width': stroke,
+        'stroke-linecap': 'round',
+        opacity: 0.22,
+    }));
+
+    const sweep = el('path', {
+        d: arcPath(cx, cy, r, 180, 180 - 179.99 * Math.max(clamped, 0.004)),
+        fill: 'none',
+        stroke: color,
+        'stroke-width': stroke,
+        'stroke-linecap': 'round',
+    });
+
+    root.appendChild(sweep);
+
+    if (!reduced()) {
+        const length = sweep.getTotalLength?.() ?? 0;
+
+        if (length) {
+            sweep.style.strokeDasharray = String(length);
+            sweep.animate(
+                [{ strokeDashoffset: length }, { strokeDashoffset: 0 }],
+                { duration: 950, delay: 140, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)', fill: 'both' },
+            );
+        }
+    }
+
+    root.appendChild(label(valueText, {
+        x: cx,
+        y: cy - 4,
+        'text-anchor': 'middle',
+        fill: 'var(--text-primary)',
+        'font-size': 27,
+        'font-weight': 600,
+        'letter-spacing': '-0.02em',
+        'font-variant-numeric': 'normal',
+    }));
+
+    container.appendChild(root);
+}

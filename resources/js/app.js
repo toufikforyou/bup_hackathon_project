@@ -1,4 +1,4 @@
-import { createTooltip, renderEnergyChart, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
+import { createTooltip, renderEnergyChart, renderGauge, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
 
 const DIRECTIVE_META = {
     solar_reduction: ['var(--series-solar)', 'Solar reduction'],
@@ -451,9 +451,9 @@ function boot(root) {
                 label: 'Pipeline',
                 value: latency >= 1000 ? (latency / 1000).toFixed(1) : Math.round(latency).toString(),
                 unit: latency >= 1000 ? 's' : 'ms',
-                ratio: Math.min(1, latency / budget),
+                ratio: Math.max(0, 1 - latency / budget),
                 color: latencyColor(latency / budget),
-                note: latency <= budget ? 'within the 5 s budget' : 'over the 5 s budget',
+                note: latency <= budget ? 'headroom in the 5 s budget' : 'over the 5 s budget',
             },
         ];
 
@@ -472,39 +472,24 @@ function boot(root) {
             caption.className = 'eyebrow';
             caption.textContent = metric.label;
 
-            const figure = document.createElement('p');
-            figure.className = 'metric-value mt-2.5';
-            figure.textContent = metric.value;
-
-            const unit = document.createElement('span');
-            unit.className = 'metric-unit';
-            unit.textContent = metric.unit;
-            figure.appendChild(unit);
-
-            const track = document.createElement('div');
-            track.className = 'meter mt-4';
-            track.style.background = `color-mix(in oklab, ${metric.color} 16%, transparent)`;
-            track.setAttribute('role', 'img');
-            track.setAttribute('aria-label', `${metric.label}: ${metric.value}${metric.unit}`);
-
-            const fill = document.createElement('span');
-            fill.style.background = metric.color;
-            fill.style.width = reducedMotion() ? `${Math.min(100, metric.ratio * 100)}%` : '0%';
-            track.appendChild(fill);
+            const dial = document.createElement('div');
+            dial.className = 'gauge mt-3';
+            dial.setAttribute('role', 'img');
+            dial.setAttribute('aria-label', `${metric.label}: ${metric.value} ${metric.unit}`);
 
             const note = document.createElement('p');
-            note.className = 'mt-2.5 text-[11.5px] leading-snug';
+            note.className = 'mt-3 text-center text-[11.5px] leading-snug';
             note.style.color = 'var(--text-muted)';
             note.textContent = metric.note;
 
-            cell.append(caption, figure, track, note);
+            cell.append(caption, dial, note);
             ui.metrics.appendChild(cell);
 
-            if (!reducedMotion()) {
-                requestAnimationFrame(() => {
-                    fill.style.width = `${Math.min(100, metric.ratio * 100)}%`;
-                });
-            }
+            renderGauge(dial, {
+                ratio: metric.ratio,
+                color: metric.color,
+                valueText: metric.unit === '%' ? `${metric.value}%` : `${metric.value} ${metric.unit}`,
+            });
         });
     }
 
