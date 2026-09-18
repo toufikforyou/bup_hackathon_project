@@ -468,12 +468,25 @@ operations console posts to a root-relative path, so it inherits the page's sche
 ## Operations console
 
 `GET /` serves a browser console for demonstrating and debugging the pipeline. It is not part of the judged API
-contract and calls its own internal route.
+contract and posts to its own internal route.
 
-It shows the ten public sample cases, an editable note and battery panel, the live `/health` state, the resulting
-interpretation with a per-note match indicator against the public reference, an hourly stacked energy chart with the
-demand and tariff curves, the battery state-of-charge trace against the active reserve floor, the replay verification
-result, and the raw API response.
+It shows the ten public sample cases, an editable note and battery panel, live `/health` state, the resulting
+interpretation with a per-note match indicator against the public reference, the 24-hour plan as a chart or a table,
+the battery state-of-charge trace against its active reserve floor, the replay verification result, and the raw API
+response.
+
+**Chart design.** The plan is drawn as a stacked column chart - solar, battery discharge and grid import - against a
+stepped demand reference line; anything above that line is energy being stored. Tariff is a **separate chart on its own
+scale** sharing the same hour axis, never a second y-axis on the same plot, because two arbitrary scales on one frame
+invent a correlation that is not in the data. Every hour carries a hover and keyboard tooltip, the series palette is
+validated for colour-vision deficiency and contrast in both themes, a legend is always present, and the **table view is
+the WCAG-clean twin** so no value is reachable only by hovering.
+
+**Theme.** Light and dark are both first-class: the dark palette is its own set of steps chosen for the dark surface,
+not an inverted copy. The toggle persists to `localStorage` and falls back to the OS setting.
+
+**Motion.** Entrance staggers, column growth, line draw-on and value count-ups are all suppressed under
+`prefers-reduced-motion: reduce`.
 
 ---
 

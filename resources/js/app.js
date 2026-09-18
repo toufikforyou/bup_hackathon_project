@@ -1,12 +1,12 @@
-import { renderEnergyChart, renderSocChart } from './charts.js';
+import { createTooltip, renderEnergyChart, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
 
-const DIRECTIVE_STYLES = {
-    solar_reduction: ['var(--color-solar)', 'Solar reduction'],
-    minimum_battery_reserve: ['var(--color-battery)', 'Minimum reserve'],
-    no_charge_window: ['var(--color-demand)', 'No charging'],
-    no_discharge_window: ['var(--color-tariff)', 'No discharging'],
-    max_grid_window: ['var(--color-grid)', 'Grid cap'],
-    no_op: ['var(--color-ink-3)', 'No operation'],
+const DIRECTIVE_META = {
+    solar_reduction: ['var(--series-solar)', 'Solar reduction'],
+    minimum_battery_reserve: ['var(--series-battery)', 'Minimum reserve'],
+    no_charge_window: ['var(--series-tariff)', 'No charging'],
+    no_discharge_window: ['var(--status-serious)', 'No discharging'],
+    max_grid_window: ['var(--series-grid)', 'Grid cap'],
+    no_op: ['var(--text-muted)', 'No operation'],
 };
 
 const BATTERY_FIELDS = [
@@ -17,73 +17,140 @@ const BATTERY_FIELDS = [
     ['max_discharge_kwh_per_hour', 'Max discharge / h'],
 ];
 
+const REPLAY_CHECKS = [
+    '24 unique hours, 0 through 23',
+    'hourly energy balance',
+    'solar within effective availability',
+    'battery transitions, bounds and rate limits',
+    'directive windows, reserve and grid caps',
+    'end-of-day battery neutrality',
+    'reported totals match the plan',
+];
+
+const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function boot(root) {
     const samples = JSON.parse(root.dataset.samples || '[]');
     const provider = JSON.parse(root.dataset.provider || '{}');
     const endpoint = root.dataset.endpoint;
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+    const tooltip = createTooltip();
 
     const state = {
         sampleId: samples[0]?.id ?? null,
         scenario: structuredClone(samples[0]?.input ?? emptyScenario()),
         notes: [...(samples[0]?.input.operator_notes ?? [''])],
+        last: null,
     };
 
-    const ui = {
-        sampleList: document.getElementById('sample-list'),
-        sampleCount: document.getElementById('sample-count'),
-        noteList: document.getElementById('note-list'),
-        addNote: document.getElementById('add-note'),
-        batteryFields: document.getElementById('battery-fields'),
-        run: document.getElementById('run'),
-        runLabel: document.getElementById('run-label'),
-        empty: document.getElementById('empty-state'),
-        output: document.getElementById('output'),
-        kpis: document.getElementById('kpis'),
-        directives: document.getElementById('directives'),
-        source: document.getElementById('interpretation-source'),
-        energyChart: document.getElementById('energy-chart'),
-        socChart: document.getElementById('soc-chart'),
-        socNote: document.getElementById('soc-note'),
-        replay: document.getElementById('replay'),
-        replayPill: document.getElementById('replay-pill'),
-        rawJson: document.getElementById('raw-json'),
-        copyJson: document.getElementById('copy-json'),
-    };
+    const ui = {};
 
+    for (const id of [
+        'sample-list', 'sample-count', 'note-list', 'add-note', 'battery-fields', 'run', 'run-label',
+        'empty-state', 'output', 'hero-value', 'hero-delta', 'stats', 'directives', 'interpretation-source',
+        'legend', 'energy-chart', 'tariff-chart', 'soc-chart', 'soc-note', 'replay', 'replay-badge',
+        'raw-json', 'copy-json', 'plan-table', 'view-chart', 'view-table', 'theme-toggle',
+    ]) {
+        ui[id] = document.getElementById(id);
+    }
+
+    setupTheme(ui['theme-toggle']);
     checkHealth();
     paintProvider(provider);
     paintSamples();
     paintNotes();
     paintBattery();
+    paintLegend();
+    setupViewTabs();
 
-    ui.addNote.addEventListener('click', () => {
+    ui['add-note'].addEventListener('click', () => {
         if (state.notes.length >= 3) return;
         state.notes.push('');
         paintNotes();
+        ui['note-list'].lastElementChild?.querySelector('textarea')?.focus();
     });
 
     ui.run.addEventListener('click', run);
 
-    ui.copyJson.addEventListener('click', async () => {
-        await navigator.clipboard.writeText(ui.rawJson.textContent ?? '');
-        ui.copyJson.textContent = 'Copied';
-        setTimeout(() => (ui.copyJson.textContent = 'Copy JSON'), 1400);
+    ui['copy-json'].addEventListener('click', async () => {
+        try {
+            await navigator.clipboard.writeText(ui['raw-json'].textContent ?? '');
+            ui['copy-json'].textContent = 'Copied';
+        } catch {
+            ui['copy-json'].textContent = 'Copy failed';
+        }
+
+        setTimeout(() => (ui['copy-json'].textContent = 'Copy JSON'), 1500);
     });
 
-    function paintSamples() {
-        ui.sampleCount.textContent = `${samples.length} public cases`;
-        ui.sampleList.replaceChildren();
+    function setupTheme(button) {
+        const apply = (theme) => {
+            document.documentElement.dataset.theme = theme;
 
-        for (const sample of samples) {
+            try {
+                localStorage.setItem('gridwise-theme', theme);
+            } catch {
+                /* storage unavailable */
+            }
+
+            const dark = theme === 'dark';
+            button.querySelector('[data-icon="sun"]').classList.toggle('hidden', !dark);
+            button.querySelector('[data-icon="moon"]').classList.toggle('hidden', dark);
+        };
+
+        const current = document.documentElement.dataset.theme
+            || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+        apply(current);
+
+        button.addEventListener('click', () => {
+            apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+
+            if (state.last) {
+                drawCharts(state.last.response, state.last.diagnostics, state.last.payload);
+            }
+        });
+    }
+
+    function setupViewTabs() {
+        for (const tab of document.querySelectorAll('[data-view]')) {
+            tab.addEventListener('click', () => {
+                for (const other of document.querySelectorAll('[data-view]')) {
+                    other.setAttribute('aria-selected', String(other === tab));
+                }
+
+                const chart = tab.dataset.view === 'chart';
+                ui['view-chart'].classList.toggle('hidden', !chart);
+                ui['view-table'].classList.toggle('hidden', chart);
+            });
+        }
+    }
+
+    function paintSamples() {
+        ui['sample-count'].textContent = `${samples.length} public cases`;
+        ui['sample-list'].replaceChildren();
+
+        samples.forEach((sample, index) => {
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'sample-chip';
-            button.dataset.active = String(sample.id === state.sampleId);
-            button.innerHTML = `
-                <span class="block text-[13px] font-medium">${escapeHtml(sample.label)}</span>
-                <span class="mt-0.5 block text-[11px] text-[var(--color-ink-3)]">${sample.id} · ${sample.input.operator_notes.length} note(s)</span>
-            `;
+            button.className = 'scenario-row';
+            button.setAttribute('aria-pressed', String(sample.id === state.sampleId));
+
+            const title = document.createElement('span');
+            title.className = 'block text-[12.5px] font-medium';
+            title.textContent = sample.label;
+
+            const meta = document.createElement('span');
+            meta.className = 'mt-0.5 block text-[11px]';
+            meta.style.color = 'var(--text-muted)';
+            meta.textContent = `${sample.id} · ${sample.input.operator_notes.length} note(s)`;
+
+            button.append(title, meta);
+
+            if (!reducedMotion()) {
+                button.classList.add('rise');
+                button.style.animationDelay = `${index * 24}ms`;
+            }
 
             button.addEventListener('click', () => {
                 state.sampleId = sample.id;
@@ -94,28 +161,31 @@ function boot(root) {
                 paintBattery();
             });
 
-            ui.sampleList.appendChild(button);
-        }
+            ui['sample-list'].appendChild(button);
+        });
     }
 
     function paintNotes() {
-        ui.noteList.replaceChildren();
+        ui['note-list'].replaceChildren();
 
         state.notes.forEach((note, index) => {
             const wrapper = document.createElement('div');
             wrapper.className = 'relative';
 
             const area = document.createElement('textarea');
-            area.className = 'field resize-none pr-8';
+            area.className = 'field resize-none pr-7 text-[12.5px] leading-relaxed';
             area.rows = 4;
             area.value = note;
+            area.setAttribute('aria-label', `Operator note ${index + 1}`);
             area.placeholder = `Operator note ${index + 1}`;
             area.addEventListener('input', () => (state.notes[index] = area.value));
 
             const remove = document.createElement('button');
             remove.type = 'button';
-            remove.className = 'absolute right-2 top-2 text-[var(--color-ink-3)] transition hover:text-[var(--color-danger)]';
-            remove.innerHTML = '&times;';
+            remove.className = 'absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-md text-[15px] leading-none';
+            remove.style.color = 'var(--text-muted)';
+            remove.setAttribute('aria-label', `Remove note ${index + 1}`);
+            remove.textContent = '×';
             remove.disabled = state.notes.length <= 1;
             remove.addEventListener('click', () => {
                 state.notes.splice(index, 1);
@@ -123,19 +193,23 @@ function boot(root) {
             });
 
             wrapper.append(area, remove);
-            ui.noteList.appendChild(wrapper);
+            ui['note-list'].appendChild(wrapper);
         });
 
-        ui.addNote.disabled = state.notes.length >= 3;
+        ui['add-note'].disabled = state.notes.length >= 3;
     }
 
     function paintBattery() {
-        ui.batteryFields.replaceChildren();
+        ui['battery-fields'].replaceChildren();
 
-        for (const [key, label] of BATTERY_FIELDS) {
+        for (const [key, text] of BATTERY_FIELDS) {
             const wrapper = document.createElement('label');
             wrapper.className = 'block space-y-1';
-            wrapper.innerHTML = `<span class="text-[11px] text-[var(--color-ink-3)]">${label}</span>`;
+
+            const caption = document.createElement('span');
+            caption.className = 'block text-[11px]';
+            caption.style.color = 'var(--text-muted)';
+            caption.textContent = text;
 
             const input = document.createElement('input');
             input.type = 'number';
@@ -147,39 +221,60 @@ function boot(root) {
                 state.scenario.battery[key] = Number(input.value);
             });
 
-            wrapper.appendChild(input);
-            ui.batteryFields.appendChild(wrapper);
+            wrapper.append(caption, input);
+            ui['battery-fields'].appendChild(wrapper);
+        }
+    }
+
+    function paintLegend() {
+        ui.legend.replaceChildren();
+
+        const entries = [
+            [SERIES_META.solar.color, SERIES_META.solar.label, 'swatch'],
+            [SERIES_META.battery.color, SERIES_META.battery.label, 'swatch'],
+            [SERIES_META.grid.color, SERIES_META.grid.label, 'swatch'],
+            ['var(--text-muted)', 'Demand', 'swatch-line'],
+        ];
+
+        for (const [color, text, shape] of entries) {
+            const item = document.createElement('span');
+            item.className = 'flex items-center gap-1.5';
+
+            const key = document.createElement('span');
+            key.className = shape;
+            key.style.background = color;
+
+            const caption = document.createElement('span');
+            caption.textContent = text;
+
+            item.append(key, caption);
+            ui.legend.appendChild(item);
         }
     }
 
     function paintProvider(provider) {
-        const pill = document.getElementById('provider-pill');
-
         if (!provider.configured) {
-            pill.style.borderColor = 'var(--color-tariff)';
+            document.getElementById('provider-chip').style.borderColor = 'var(--status-warning)';
             document.getElementById('provider-text').textContent = `${provider.driver} · not configured`;
         }
     }
 
     async function checkHealth() {
         const dot = document.getElementById('health-dot');
-        const label = document.getElementById('health-text');
+        const text = document.getElementById('health-text');
 
         try {
             const response = await fetch('/health', { headers: { Accept: 'application/json' } });
             const body = await response.json();
 
-            if (body.status === 'ok') {
-                dot.classList.add('dot-live');
-                label.textContent = '/health ok';
+            if (body.status !== 'ok') throw new Error('unhealthy');
 
-                return;
-            }
-
-            throw new Error('unhealthy');
+            dot.style.background = 'var(--status-good)';
+            dot.dataset.live = 'true';
+            text.textContent = '/health ok';
         } catch {
-            dot.style.background = 'var(--color-danger)';
-            label.textContent = '/health unreachable';
+            dot.style.background = 'var(--status-critical)';
+            text.textContent = '/health unreachable';
         }
     }
 
@@ -212,12 +307,10 @@ function boot(root) {
                 throw new Error(body.message ?? 'The request was rejected.');
             }
 
+            state.last = { response: body.response, diagnostics: body.diagnostics, payload };
             paintResults(body.response, body.diagnostics, payload);
         } catch (error) {
-            ui.empty.classList.remove('hidden');
-            ui.empty.innerHTML = `<p class="text-sm text-[var(--color-danger)]">${escapeHtml(error.message)}</p>`;
-            ui.output.classList.add('hidden');
-            ui.output.classList.remove('flex');
+            showError(error.message);
         } finally {
             setBusy(false);
         }
@@ -225,11 +318,36 @@ function boot(root) {
 
     function setBusy(busy) {
         ui.run.disabled = busy;
-        ui.runLabel.textContent = busy ? 'Running pipeline…' : 'Interpret & optimise';
+        ui.run.dataset.busy = String(busy);
+        ui['run-label'].textContent = busy ? 'Running pipeline…' : 'Interpret & optimise';
+        ui.output.classList.toggle('stale', busy);
+    }
+
+    function showError(message) {
+        ui['empty-state'].classList.remove('hidden');
+        ui.output.classList.add('hidden');
+        ui.output.classList.remove('flex');
+        ui['empty-state'].replaceChildren();
+
+        const box = document.createElement('div');
+        box.className = 'max-w-md space-y-2';
+
+        const title = document.createElement('p');
+        title.className = 'text-sm font-semibold';
+        title.style.color = 'var(--status-critical)';
+        title.textContent = 'The request was rejected';
+
+        const detail = document.createElement('p');
+        detail.className = 'text-[12.5px] leading-relaxed';
+        detail.style.color = 'var(--text-secondary)';
+        detail.textContent = message;
+
+        box.append(title, detail);
+        ui['empty-state'].appendChild(box);
     }
 
     function paintResults(response, diagnostics, payload) {
-        ui.empty.classList.add('hidden');
+        ui['empty-state'].classList.add('hidden');
         ui.output.classList.remove('hidden');
         ui.output.classList.add('flex');
 
@@ -238,61 +356,84 @@ function boot(root) {
             ? sample
             : null;
 
-        paintKpis(response, diagnostics, reference);
+        paintHero(response, reference);
+        paintStats(response, diagnostics);
         paintDirectives(response.directive_interpretation, reference);
         paintSource(diagnostics.interpretation);
-
-        renderEnergyChart(ui.energyChart, {
-            plan: response.hourly_plan,
-            hours: payload.hours,
-            constraints: diagnostics.constraints,
-        });
-
-        renderSocChart(ui.socChart, {
-            plan: response.hourly_plan,
-            constraints: diagnostics.constraints,
-            battery: payload.battery,
-        });
-
-        ui.socNote.textContent = `ends at ${format(response.hourly_plan.at(-1).battery_energy_after_kwh)} kWh · started at ${format(payload.battery.initial_energy_kwh)} kWh`;
-
+        drawCharts(response, diagnostics, payload);
+        paintTable(response, payload);
         paintReplay(diagnostics.replay);
 
-        ui.rawJson.textContent = JSON.stringify(response, null, 2);
+        ui['soc-note'].textContent = `ends at ${formatNumber(response.hourly_plan.at(-1).battery_energy_after_kwh)} kWh · started at ${formatNumber(payload.battery.initial_energy_kwh)} kWh`;
+        ui['raw-json'].textContent = JSON.stringify(response, null, 2);
     }
 
-    function paintKpis(response, diagnostics, reference) {
+    function paintHero(response, reference) {
+        countUp(ui['hero-value'], response.total_cost_bdt);
+
+        ui['hero-delta'].replaceChildren();
+
+        if (reference?.expected_cost == null) return;
+
+        const ratio = Math.min(1, reference.expected_cost / Math.max(response.total_cost_bdt, 0.01));
+        const optimal = Math.abs(ratio - 1) < 1e-6;
+
+        const badge = document.createElement('span');
+        badge.className = 'badge';
+        badge.style.color = optimal ? 'var(--status-good)' : 'var(--status-serious)';
+        badge.textContent = optimal
+            ? '✓ matches organizer optimal'
+            : `${(ratio * 100).toFixed(1)}% of organizer optimal`;
+
+        ui['hero-delta'].appendChild(badge);
+    }
+
+    function paintStats(response, diagnostics) {
+        const peak = response.hourly_plan.reduce(
+            (best, entry) => (entry.grid_kwh > best.grid_kwh ? entry : best),
+            response.hourly_plan[0],
+        );
+
+        const applied = response.directive_interpretation.filter((entry) => entry.applies).length;
+
         const cards = [
-            ['Total cost', `${format(response.total_cost_bdt)}`, 'BDT', 'var(--color-grid)'],
-            ['Grid import', `${format(response.total_grid_kwh)}`, 'kWh', 'var(--color-demand)'],
-            ['Peak hour', `${format(response.peak_grid_kwh)}`, 'kWh', 'var(--color-tariff)'],
-            ['Pipeline', `${format(diagnostics.total_latency_ms)}`, 'ms', 'var(--color-solar)'],
+            ['Grid import', response.total_grid_kwh, 'kWh', 'bought across 24 hours'],
+            ['Peak hour', response.peak_grid_kwh, 'kWh', `highest single hour is ${String(peak.hour).padStart(2, '0')}:00`],
+            ['Pipeline', diagnostics.total_latency_ms, 'ms', `${applied} of ${response.directive_interpretation.length} notes applied`],
         ];
 
-        ui.kpis.replaceChildren();
+        ui.stats.replaceChildren();
 
-        cards.forEach(([label, value, unit, color], index) => {
+        cards.forEach(([labelText, value, unit, note], index) => {
             const card = document.createElement('div');
-            card.className = 'panel kpi fade-up';
-            card.style.animationDelay = `${index * 40}ms`;
+            card.className = 'card flex flex-col justify-between p-4';
 
-            let footer = '';
-
-            if (label === 'Total cost' && reference?.expected_cost != null) {
-                const ratio = Math.min(1, reference.expected_cost / Math.max(response.total_cost_bdt, 0.01));
-                const optimal = Math.abs(ratio - 1) < 1e-6;
-                footer = `<p class="mt-1.5 text-[11px] ${optimal ? 'text-[var(--color-solar)]' : 'text-[var(--color-tariff)]'}">
-                    ${optimal ? 'matches organizer optimal' : `${(ratio * 100).toFixed(1)}% of optimal`}
-                </p>`;
+            if (!reducedMotion()) {
+                card.classList.add('rise');
+                card.style.animationDelay = `${60 + index * 60}ms`;
             }
 
-            card.innerHTML = `
-                <p class="text-[11px] uppercase tracking-wider text-[var(--color-ink-3)]">${label}</p>
-                <p class="kpi-value mt-1" style="color:${color}">${value}<span class="ml-1 text-xs font-normal text-[var(--color-ink-3)]">${unit}</span></p>
-                ${footer}
-            `;
+            const caption = document.createElement('p');
+            caption.className = 'eyebrow';
+            caption.textContent = labelText;
 
-            ui.kpis.appendChild(card);
+            const figure = document.createElement('p');
+            figure.className = 'stat-value mt-1.5';
+
+            const suffix = document.createElement('span');
+            suffix.className = 'ml-1 text-[12px] font-normal';
+            suffix.style.color = 'var(--text-muted)';
+            suffix.textContent = unit;
+
+            const footnote = document.createElement('p');
+            footnote.className = 'mt-2 text-[11.5px] leading-snug';
+            footnote.style.color = 'var(--text-muted)';
+            footnote.textContent = note;
+
+            card.append(caption, figure, footnote);
+            ui.stats.appendChild(card);
+
+            countUp(figure, value, suffix);
         });
     }
 
@@ -300,40 +441,110 @@ function boot(root) {
         ui.directives.replaceChildren();
 
         entries.forEach((entry, index) => {
-            const [color, label] = DIRECTIVE_STYLES[entry.directive_type] ?? ['var(--color-ink-3)', entry.directive_type];
+            const [color, typeLabel] = DIRECTIVE_META[entry.directive_type] ?? ['var(--text-muted)', entry.directive_type];
             const expected = reference?.expected?.[index] ?? null;
             const matches = expected ? sameDirective(expected, entry) : null;
 
             const card = document.createElement('div');
-            card.className = 'rounded-xl border border-[var(--color-line)] bg-[var(--color-surface-2)] p-3.5 fade-up';
-            card.style.animationDelay = `${index * 50}ms`;
+            card.className = 'rounded-[11px] border p-3';
+            card.style.borderColor = 'var(--border)';
+            card.style.background = 'var(--surface-2)';
+
+            if (!reducedMotion()) {
+                card.classList.add('rise');
+                card.style.animationDelay = `${index * 70}ms`;
+            }
+
+            const top = document.createElement('div');
+            top.className = 'flex flex-wrap items-start justify-between gap-2';
+
+            const noteText = document.createElement('p');
+            noteText.className = 'max-w-[72ch] text-[12.5px] leading-relaxed';
+            noteText.style.color = 'var(--text-secondary)';
+
+            const idx = document.createElement('span');
+            idx.className = 'mr-1.5 font-mono text-[11px]';
+            idx.style.color = 'var(--text-muted)';
+            idx.textContent = `[${entry.note_index}]`;
+
+            noteText.append(idx, document.createTextNode(state.notes[entry.note_index] ?? ''));
+
+            const badges = document.createElement('div');
+            badges.className = 'flex flex-none items-center gap-1.5';
+
+            if (matches !== null) {
+                const verdict = document.createElement('span');
+                verdict.className = 'badge';
+                verdict.style.color = matches ? 'var(--status-good)' : 'var(--status-critical)';
+                verdict.textContent = matches ? '✓ match' : '✗ differs';
+                badges.appendChild(verdict);
+            }
+
+            const typeBadge = document.createElement('span');
+            typeBadge.className = 'badge';
+            typeBadge.style.color = color;
+            typeBadge.style.background = `color-mix(in oklab, ${color} 12%, transparent)`;
+            typeBadge.textContent = typeLabel;
+            badges.appendChild(typeBadge);
+
+            top.append(noteText, badges);
+
+            const facts = document.createElement('div');
+            facts.className = 'mt-2.5 flex flex-wrap items-center gap-1.5';
+
+            facts.appendChild(fact('applies', String(entry.applies)));
 
             const hours = entry.structured_adjustment?.hours ?? [];
+
+            if (hours.length) {
+                facts.appendChild(caption('hours'));
+
+                for (const hour of hours) {
+                    const chip = document.createElement('span');
+                    chip.className = 'hour-chip';
+                    chip.textContent = String(hour);
+                    facts.appendChild(chip);
+                }
+            }
+
             const numeric = numericOf(entry.structured_adjustment);
 
-            card.innerHTML = `
-                <div class="flex flex-wrap items-start justify-between gap-2">
-                    <p class="max-w-[70ch] text-[13px] leading-relaxed text-[var(--color-ink-2)]">
-                        <span class="mr-1.5 font-mono text-[11px] text-[var(--color-ink-3)]">[${entry.note_index}]</span>
-                        ${escapeHtml(state.notes[entry.note_index] ?? '')}
-                    </p>
-                    <div class="flex items-center gap-1.5">
-                        ${matches === null ? '' : `<span class="tag" style="color:${matches ? 'var(--color-solar)' : 'var(--color-danger)'};border-color:currentColor">${matches ? 'match' : 'differs'}</span>`}
-                        <span class="tag" style="color:${color};border-color:currentColor;background:color-mix(in oklab, ${color} 12%, transparent)">${label}</span>
-                    </div>
-                </div>
-                <div class="mt-3 flex flex-wrap items-center gap-2">
-                    <span class="text-[11px] uppercase tracking-wider text-[var(--color-ink-3)]">applies</span>
-                    <span class="hour-chip" style="color:${entry.applies ? 'var(--color-solar)' : 'var(--color-ink-3)'}">${entry.applies}</span>
-                    ${hours.length ? `<span class="ml-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-3)]">hours</span>` : ''}
-                    ${hours.map((hour) => `<span class="hour-chip">${hour}</span>`).join('')}
-                    ${numeric ? `<span class="ml-2 text-[11px] uppercase tracking-wider text-[var(--color-ink-3)]">${numeric.key}</span><span class="hour-chip">${numeric.value}</span>` : ''}
-                </div>
-                <p class="mt-2.5 text-[12px] leading-relaxed text-[var(--color-ink-3)]">${escapeHtml(entry.explanation)}</p>
-            `;
+            if (numeric) {
+                facts.appendChild(caption(numeric.key));
+                const chip = document.createElement('span');
+                chip.className = 'hour-chip';
+                chip.textContent = String(numeric.value);
+                facts.appendChild(chip);
+            }
 
+            const explanation = document.createElement('p');
+            explanation.className = 'mt-2 text-[12px] leading-relaxed';
+            explanation.style.color = 'var(--text-muted)';
+            explanation.textContent = entry.explanation;
+
+            card.append(top, facts, explanation);
             ui.directives.appendChild(card);
         });
+    }
+
+    function caption(text) {
+        const node = document.createElement('span');
+        node.className = 'text-[10.5px] uppercase tracking-wider';
+        node.style.color = 'var(--text-muted)';
+        node.textContent = text;
+
+        return node;
+    }
+
+    function fact(key, value) {
+        const wrap = document.createElement('span');
+        wrap.className = 'flex items-center gap-1.5';
+        const chip = document.createElement('span');
+        chip.className = 'hour-chip';
+        chip.textContent = value;
+        wrap.append(caption(key), chip);
+
+        return wrap;
     }
 
     function paintSource(interpretation) {
@@ -344,53 +555,145 @@ function boot(root) {
         };
 
         const healthy = interpretation.source !== 'deterministic_fallback';
+        const chip = ui['interpretation-source'];
 
-        ui.source.style.borderColor = healthy ? 'var(--color-line)' : 'var(--color-tariff)';
-        ui.source.textContent = `${labels[interpretation.source] ?? interpretation.source} · ${interpretation.driver} · ${format(interpretation.latency_ms)} ms${interpretation.cached ? ' · cached' : ''}`;
+        chip.replaceChildren();
+        chip.style.borderColor = healthy ? 'var(--border)' : 'var(--status-warning)';
+
+        const dot = document.createElement('span');
+        dot.className = 'swatch';
+        dot.style.background = healthy ? 'var(--status-good)' : 'var(--status-warning)';
+
+        const text = document.createElement('span');
+        text.textContent = `${labels[interpretation.source] ?? interpretation.source} · ${interpretation.driver}${interpretation.cached ? ' · cached' : ` · ${formatNumber(interpretation.latency_ms)} ms`}`;
+
+        chip.append(dot, text);
+    }
+
+    function drawCharts(response, diagnostics, payload) {
+        renderEnergyChart(ui['energy-chart'], {
+            plan: response.hourly_plan,
+            hours: payload.hours,
+            tooltip,
+        });
+
+        renderTariffChart(ui['tariff-chart'], { hours: payload.hours, tooltip });
+
+        renderSocChart(ui['soc-chart'], {
+            plan: response.hourly_plan,
+            constraints: diagnostics.constraints,
+            battery: payload.battery,
+            tooltip,
+        });
+    }
+
+    function paintTable(response, payload) {
+        ui['plan-table'].replaceChildren();
+
+        response.hourly_plan.forEach((entry) => {
+            const hour = payload.hours[entry.hour];
+            const row = document.createElement('tr');
+
+            const battery = entry.battery_action === 'idle'
+                ? '—'
+                : `${entry.battery_action === 'charge' ? '+' : '−'}${formatNumber(entry.battery_kwh)}`;
+
+            const cells = [
+                String(entry.hour).padStart(2, '0'),
+                formatNumber(hour.demand_kwh),
+                formatNumber(entry.solar_used_kwh),
+                battery,
+                formatNumber(entry.grid_kwh),
+                formatNumber(entry.battery_energy_after_kwh),
+                formatNumber(hour.tariff_bdt_per_kwh),
+                formatNumber(entry.grid_kwh * hour.tariff_bdt_per_kwh),
+            ];
+
+            cells.forEach((value, index) => {
+                const cell = document.createElement(index === 0 ? 'th' : 'td');
+
+                if (index === 0) cell.setAttribute('scope', 'row');
+
+                cell.textContent = value;
+                row.appendChild(cell);
+            });
+
+            ui['plan-table'].appendChild(row);
+        });
     }
 
     function paintReplay(replay) {
-        ui.replayPill.style.borderColor = replay.valid ? 'var(--color-solar)' : 'var(--color-danger)';
-        ui.replayPill.style.color = replay.valid ? 'var(--color-solar)' : 'var(--color-danger)';
-        ui.replayPill.textContent = replay.valid ? 'all checks passed' : `${replay.violations.length} violation(s)`;
-
-        const checks = [
-            '24 unique hours, 0 through 23',
-            'hourly energy balance',
-            'solar within effective availability',
-            'battery transitions, bounds and rate limits',
-            'directive windows, reserve and grid caps',
-            'end-of-day battery neutrality',
-            'reported totals match the plan',
-        ];
+        const badge = ui['replay-badge'];
+        badge.style.color = replay.valid ? 'var(--status-good)' : 'var(--status-critical)';
+        badge.textContent = replay.valid
+            ? '✓ all checks passed'
+            : `✗ ${replay.violations.length} violation(s)`;
 
         ui.replay.replaceChildren();
 
         const list = document.createElement('ul');
-        list.className = 'space-y-2';
+        list.className = 'space-y-1.5';
 
-        for (const check of checks) {
+        REPLAY_CHECKS.forEach((check, index) => {
             const item = document.createElement('li');
-            item.className = 'flex items-center gap-2.5 text-[12.5px] text-[var(--color-ink-2)]';
-            item.innerHTML = `
-                <span class="grid h-4 w-4 place-items-center rounded-full" style="background:color-mix(in oklab, ${replay.valid ? 'var(--color-solar)' : 'var(--color-danger)'} 18%, transparent)">
-                    <svg viewBox="0 0 24 24" class="h-2.5 w-2.5" fill="none" stroke="${replay.valid ? 'var(--color-solar)' : 'var(--color-danger)'}" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
-                        ${replay.valid ? '<path d="m5 13 4 4L19 7"/>' : '<path d="M6 6l12 12M18 6 6 18"/>'}
-                    </svg>
-                </span>
-                ${check}
-            `;
+            item.className = 'flex items-center gap-2.5 text-[12.5px]';
+            item.style.color = 'var(--text-secondary)';
+
+            if (!reducedMotion()) {
+                item.classList.add('rise');
+                item.style.animationDelay = `${index * 45}ms`;
+            }
+
+            const mark = document.createElement('span');
+            mark.className = 'grid h-[18px] w-[18px] flex-none place-items-center rounded-full text-[11px] font-bold';
+            mark.style.color = replay.valid ? 'var(--status-good)' : 'var(--status-critical)';
+            mark.style.background = `color-mix(in oklab, ${replay.valid ? 'var(--status-good)' : 'var(--status-critical)'} 16%, transparent)`;
+            mark.textContent = replay.valid ? '✓' : '✗';
+
+            const text = document.createElement('span');
+            text.textContent = check;
+
+            item.append(mark, text);
             list.appendChild(item);
-        }
+        });
 
         ui.replay.appendChild(list);
 
-        if (!replay.valid) {
-            const detail = document.createElement('pre');
-            detail.className = 'mt-3 rounded-lg border border-[var(--color-line)] p-2.5 text-[11px] text-[var(--color-danger)]';
-            detail.textContent = replay.violations.join('\n');
-            ui.replay.appendChild(detail);
+        if (replay.valid) return;
+
+        const detail = document.createElement('pre');
+        detail.className = 'mt-3 overflow-auto rounded-lg border p-2.5 text-[11px]';
+        detail.style.borderColor = 'var(--border)';
+        detail.style.color = 'var(--status-critical)';
+        detail.textContent = replay.violations.join('\n');
+        ui.replay.appendChild(detail);
+    }
+
+    function countUp(node, target, suffix = null) {
+        const value = Number(target) || 0;
+
+        const write = (n) => {
+            node.replaceChildren(document.createTextNode(formatNumber(n)));
+            if (suffix) node.appendChild(suffix);
+        };
+
+        if (reducedMotion()) {
+            write(value);
+
+            return;
         }
+
+        const duration = 760;
+        const start = performance.now();
+
+        const tick = (now) => {
+            const t = Math.min(1, (now - start) / duration);
+            write(value * (1 - (1 - t) ** 3));
+
+            if (t < 1) requestAnimationFrame(tick);
+        };
+
+        requestAnimationFrame(tick);
     }
 }
 
@@ -402,13 +705,9 @@ function sameDirective(expected, actual) {
     const a = expected.structured_adjustment;
     const b = actual.structured_adjustment;
 
-    if (a === null || b === null) {
-        return a === b;
-    }
+    if (a === null || b === null) return a === b;
 
-    if (JSON.stringify(a.hours ?? []) !== JSON.stringify(b.hours ?? [])) {
-        return false;
-    }
+    if (JSON.stringify(a.hours ?? []) !== JSON.stringify(b.hours ?? [])) return false;
 
     for (const key of ['factor', 'minimum_energy_kwh', 'max_grid_kwh']) {
         if ((key in a) !== (key in b)) return false;
@@ -430,18 +729,8 @@ function numericOf(adjustment) {
     return null;
 }
 
-function format(value) {
+function formatNumber(value) {
     return Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
-}
-
-function escapeHtml(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;',
-    })[char]);
 }
 
 function emptyScenario() {
