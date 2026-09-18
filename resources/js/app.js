@@ -27,6 +27,8 @@ const REPLAY_CHECKS = [
     'reported totals match the plan',
 ];
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
 const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 function boot(root) {
@@ -568,9 +570,7 @@ function boot(root) {
             const matches = expected ? sameDirective(expected, entry) : null;
 
             const card = document.createElement('div');
-            card.className = 'rounded-[11px] border p-3';
-            card.style.borderColor = 'var(--border)';
-            card.style.background = 'var(--surface-2)';
+            card.className = 'entry';
 
             if (!reducedMotion()) {
                 card.classList.add('rise');
@@ -754,23 +754,29 @@ function boot(root) {
         ui.replay.replaceChildren();
 
         const list = document.createElement('ul');
-        list.className = 'space-y-1.5';
+        const tone = replay.valid ? 'var(--status-good)' : 'var(--status-critical)';
 
         REPLAY_CHECKS.forEach((check, index) => {
             const item = document.createElement('li');
-            item.className = 'flex items-center gap-2.5 text-[12.5px]';
-            item.style.color = 'var(--text-secondary)';
+            item.className = 'check-row';
 
             if (!reducedMotion()) {
                 item.classList.add('rise');
                 item.style.animationDelay = `${index * 45}ms`;
             }
 
-            const mark = document.createElement('span');
-            mark.className = 'grid h-[18px] w-[18px] flex-none place-items-center rounded-full text-[11px] font-bold';
-            mark.style.color = replay.valid ? 'var(--status-good)' : 'var(--status-critical)';
-            mark.style.background = `color-mix(in oklab, ${replay.valid ? 'var(--status-good)' : 'var(--status-critical)'} 16%, transparent)`;
-            mark.textContent = replay.valid ? '✓' : '✗';
+            const mark = document.createElementNS(SVG_NS, 'svg');
+            mark.setAttribute('viewBox', '0 0 24 24');
+            mark.setAttribute('fill', 'none');
+            mark.setAttribute('stroke', tone);
+            mark.setAttribute('stroke-width', '3');
+            mark.setAttribute('stroke-linecap', 'round');
+            mark.setAttribute('stroke-linejoin', 'round');
+            mark.setAttribute('class', 'check-mark');
+
+            const path = document.createElementNS(SVG_NS, 'path');
+            path.setAttribute('d', replay.valid ? 'm4 13 5 5L20 6' : 'M6 6l12 12M18 6 6 18');
+            mark.appendChild(path);
 
             const text = document.createElement('span');
             text.textContent = check;
