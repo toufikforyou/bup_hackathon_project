@@ -138,6 +138,39 @@ final class ApiContractTest extends TestCase
     }
 
     #[Test]
+    public function a_wrong_http_method_returns_a_clean_405(): void
+    {
+        $this->getJson('/optimize-energy')
+            ->assertStatus(405)
+            ->assertJsonPath('error', 'method_not_allowed');
+    }
+
+    #[Test]
+    public function browsing_to_the_console_endpoint_redirects_to_the_dashboard(): void
+    {
+        $this->get('/console/optimize')->assertRedirect('/');
+    }
+
+    #[Test]
+    public function errors_never_leak_a_stack_trace_even_with_debug_enabled(): void
+    {
+        config(['app.debug' => true]);
+
+        foreach ([
+            $this->getJson('/optimize-energy'),
+            $this->getJson('/does-not-exist'),
+            $this->postJson('/optimize-energy', ['scenario_id' => 'X']),
+        ] as $response) {
+            $body = (string) $response->getContent();
+
+            $this->assertStringNotContainsString('vendor/', $body);
+            $this->assertStringNotContainsString('Symfony\\Component', $body);
+            $this->assertStringNotContainsString('AbstractRouteCollection', $body);
+            $this->assertStringNotContainsString('trace', $body);
+        }
+    }
+
+    #[Test]
     public function an_unknown_endpoint_returns_a_clean_404(): void
     {
         $this->getJson('/optimise-energy')
