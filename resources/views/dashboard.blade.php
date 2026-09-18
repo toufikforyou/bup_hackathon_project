@@ -104,15 +104,20 @@
 
             <div class="hidden flex-col gap-7" id="output">
 
-                <div class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)]" id="overview">
-                    <div class="card card-lift p-7">
-                        <p class="eyebrow">Total grid electricity cost</p>
-                        <p class="hero-figure mt-3" id="hero-value">0</p>
-                        <p class="mt-2 text-[12.5px]" style="color: var(--text-secondary)">BDT across the 24-hour horizon</p>
-                        <div class="mt-5" id="hero-delta"></div>
-                    </div>
+                <div class="card overflow-hidden" id="overview">
+                    <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.45fr)]">
+                        <div class="p-8">
+                            <p class="eyebrow">Total grid electricity cost</p>
+                            <div class="mt-4 flex items-baseline gap-2.5">
+                                <span class="hero-figure" id="hero-value">0</span>
+                                <span class="text-base font-medium" style="color: var(--text-muted)">BDT</span>
+                            </div>
+                            <p class="mt-2 text-[12.5px]" style="color: var(--text-secondary)">across the 24-hour horizon</p>
+                            <div class="mt-6" id="hero-delta"></div>
+                        </div>
 
-                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-3" id="gauges"></div>
+                        <div class="grid grid-cols-1 border-t sm:grid-cols-3 lg:border-l lg:border-t-0" style="border-color: var(--border)" id="metrics"></div>
+                    </div>
                 </div>
 
                 <div class="grid grid-cols-1 gap-7 2xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]" id="interpretation">

@@ -488,6 +488,50 @@
     }
 
 
+
+    .metric {
+        padding: 1.5rem 1.5rem 1.625rem;
+    }
+
+    .metric + .metric {
+        border-top: 1px solid var(--border);
+    }
+
+    @media (min-width: 640px) {
+        .metric + .metric {
+            border-top: none;
+            border-left: 1px solid var(--border);
+        }
+    }
+
+    .metric-value {
+        font-size: 1.625rem;
+        font-weight: 600;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        color: var(--text-primary);
+    }
+
+    .metric-unit {
+        margin-left: 0.25rem;
+        font-size: 0.8125rem;
+        font-weight: 500;
+        color: var(--text-muted);
+    }
+
+    .meter {
+        height: 4px;
+        border-radius: 999px;
+        overflow: hidden;
+    }
+
+    .meter > span {
+        display: block;
+        height: 100%;
+        border-radius: 999px;
+        transition: width 0.85s cubic-bezier(0.2, 0.8, 0.3, 1);
+    }
+
     .slider-row {
         display: flex;
         flex-direction: column;
