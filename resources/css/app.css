@@ -67,6 +67,38 @@
 }
 
 @layer components {
+
+    .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 2.5rem;
+        height: 2.5rem;
+        flex: none;
+        border-radius: 13px;
+        background: linear-gradient(140deg, var(--accent), color-mix(in oklab, var(--accent) 62%, #10b981));
+        color: var(--accent-ink);
+        box-shadow: 0 8px 20px -8px var(--accent);
+    }
+
+    .brand-word {
+        font-size: 1.0625rem;
+        font-weight: 700;
+        line-height: 1.15;
+        letter-spacing: -0.025em;
+        color: var(--text-primary);
+    }
+
+    .brand-word span {
+        color: var(--accent);
+    }
+
+    .brand-tagline {
+        margin-top: 0.0625rem;
+        font-size: 0.71875rem;
+        letter-spacing: 0.005em;
+        color: var(--text-muted);
+    }
+
     .card {
         background: var(--surface-1);
         border: 1px solid var(--border);

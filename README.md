@@ -1,10 +1,16 @@
-# GridWise — LLM-Assisted Operator Directive Interpretation
+# GridOptima
+
+**Smarter Energy, Optimized for Every Hour.**
 
 Smart Campus Energy Optimization Challenge · BUP CSE Fest 2026 Hackathon · Online Preliminary
 
 A single HTTP service that reads free-text campus operator notes with a language model, converts them into
 machine-checkable directives behind deterministic guardrails, and returns a provably cost-optimal, fully valid
 24-hour energy schedule.
+
+> **Naming.** GridOptima is this team's submission. *GridWise* is the organizers' name for the challenge rules, so it
+> is kept verbatim wherever this document quotes the Problem Statement, and in the `App\GridWise` namespace and the
+> `gridwise:samples` command that operate on those rules and on the official sample pack.
 
 ```
 operator notes ──▶ LLM (structured JSON) ──▶ deterministic guardrails ──▶ linear-program optimizer ──▶ replay verifier ──▶ response
@@ -417,12 +423,12 @@ The test suite runs with `GRIDWISE_LLM_DRIVER=mock` so it needs no network and n
 ## Docker
 
 ```bash
-docker build -t gridwise-llm:1.0.0 .
+docker build -t gridoptima:1.0.0 .
 
 docker run --rm -p 8080:8080 \
   -e GRIDWISE_LLM_DRIVER=gemini \
   -e GEMINI_API_KEY=<your key> \
-  gridwise-llm:1.0.0
+  gridoptima:1.0.0
 
 curl -s http://127.0.0.1:8080/health
 ```
@@ -493,7 +499,7 @@ operations console posts to a root-relative path, so it inherits the page's sche
 
 ## Operations console
 
-`GET /` serves a browser console for demonstrating and debugging the pipeline. It is not part of the judged API
+`GET /` serves the GridOptima browser console for demonstrating and debugging the pipeline. It is not part of the judged API
 contract and posts to its own internal route.
 
 It shows the ten public sample cases, an editable note panel, range sliders for the battery limits (the initial-energy
