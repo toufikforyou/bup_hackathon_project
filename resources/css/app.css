@@ -71,13 +71,10 @@
     .brand-mark {
         display: grid;
         place-items: center;
-        width: 2.5rem;
-        height: 2.5rem;
+        width: 2.25rem;
+        height: 2.25rem;
         flex: none;
-        border-radius: 13px;
-        background: linear-gradient(140deg, var(--accent), color-mix(in oklab, var(--accent) 62%, #10b981));
-        color: var(--accent-ink);
-        box-shadow: 0 8px 20px -8px var(--accent);
+        color: var(--accent);
     }
 
     .brand-word {
