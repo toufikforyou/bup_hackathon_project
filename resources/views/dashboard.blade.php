@@ -22,7 +22,7 @@
         <div class="mx-auto flex max-w-[1640px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
             <div class="flex items-center gap-3.5">
                 <span class="brand-mark" aria-hidden="true">
-                    <svg viewBox="0 0 28 28" class="h-[22px] w-[22px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <svg viewBox="0 0 28 28" class="h-[30px] w-[30px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M4 22V15M11 22V9M18 22V13M25 22V5" opacity="0.45"/>
                         <path d="M15.5 2 7 15.5h6l-1 10.5L20.5 12H14l1.5-10Z" fill="currentColor" stroke="none"/>
                     </svg>
