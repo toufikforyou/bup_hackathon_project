@@ -24,10 +24,11 @@ operator notes ──▶ LLM (structured JSON) ──▶ deterministic guardrail
 8. [Configuration](#configuration)
 9. [Testing](#testing)
 10. [Docker](#docker)
-11. [Operations console](#operations-console)
-12. [Dependencies and credits](#dependencies-and-credits)
-13. [Known limitations](#known-limitations)
-14. [Secret handling](#secret-handling)
+11. [Running behind a proxy or tunnel](#running-behind-a-proxy-or-tunnel)
+12. [Operations console](#operations-console)
+13. [Dependencies and credits](#dependencies-and-credits)
+14. [Known limitations](#known-limitations)
+15. [Secret handling](#secret-handling)
 
 ---
 
@@ -372,6 +373,8 @@ All configuration is environment variables. Nothing secret is committed.
 | `GRIDWISE_LLM_CACHE`         | `true`              | Cache interpretations keyed by notes + battery + model    |
 | `GRIDWISE_LLM_CACHE_TTL`     | `3600`              | Cache lifetime in seconds                                 |
 | `GRIDWISE_FALLBACK`          | `true`              | Enable the deterministic safe-failure interpreter         |
+| `TRUSTED_PROXIES`            | `*`                 | Proxies whose `X-Forwarded-*` headers are trusted         |
+| `APP_FORCE_HTTPS`            | `false`             | Force https URL generation behind a terminating proxy     |
 | `GEMINI_API_KEY`             | —                   | Google AI Studio key                                      |
 | `GEMINI_MODEL`               | `gemini-2.5-flash`  | Gemini model id                                           |
 | `GEMINI_THINKING_BUDGET`     | `0`                 | Thinking tokens; `0` keeps latency low                    |
@@ -428,6 +431,37 @@ supplied, caches config/routes/views at start-up and ships with a `HEALTHCHECK` 
 baked into the image** — they are supplied with `-e` at run time.
 
 `docker-compose.yml` is provided for the same thing with an `.env` file.
+
+---
+
+## Running behind a proxy or tunnel
+
+When the service sits behind Cloudflare Tunnel, ngrok, nginx or a load balancer, TLS is terminated at the proxy and the
+origin is reached over plain HTTP. Laravel would otherwise generate `http://` URLs on an `https://` page, and the
+browser blocks them as mixed content.
+
+The application trusts the standard forwarded headers, so `X-Forwarded-Proto: https` is enough for generated URLs and
+Vite asset tags to come out as `https://`:
+
+| Variable           | Default | Meaning                                                                        |
+| ------------------ | ------- | ------------------------------------------------------------------------------ |
+| `TRUSTED_PROXIES`  | `*`     | Proxies whose `X-Forwarded-*` headers are honoured. `*` is correct when the origin is only reachable through the tunnel; pin it to your proxy CIDRs if the origin port is exposed publicly. |
+| `APP_FORCE_HTTPS`  | `false` | Forces `https://` URL generation even if the proxy strips the headers.          |
+| `APP_URL`          | —       | Set to the public origin. An `https://` value also forces the https scheme.     |
+
+For a Cloudflare Tunnel in front of this service:
+
+```bash
+APP_URL=https://your-domain.example
+TRUSTED_PROXIES=*
+```
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+
+The judged endpoints `/health` and `/optimize-energy` generate no URLs and work through any proxy unchanged. The
+operations console posts to a root-relative path, so it inherits the page's scheme regardless of configuration.
 
 ---
 

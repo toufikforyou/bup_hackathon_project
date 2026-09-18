@@ -15,7 +15,7 @@
     id="console"
     data-samples="{{ json_encode($samples) }}"
     data-provider="{{ json_encode($provider) }}"
-    data-endpoint="{{ route('dashboard.optimize') }}"
+    data-endpoint="{{ route('dashboard.optimize', absolute: false) }}"
     class="mx-auto flex min-h-screen w-full max-w-[1680px] flex-col px-4 pb-16 sm:px-6 lg:px-8"
 >
     <header class="flex flex-wrap items-center justify-between gap-4 py-6">
