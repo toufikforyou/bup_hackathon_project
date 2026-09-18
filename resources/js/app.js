@@ -1,11 +1,5 @@
 import { renderEnergyChart, renderSocChart } from './charts.js';
 
-const root = document.getElementById('console');
-
-if (root) {
-    boot(root);
-}
-
 const DIRECTIVE_STYLES = {
     solar_reduction: ['var(--color-solar)', 'Solar reduction'],
     minimum_battery_reserve: ['var(--color-battery)', 'Minimum reserve'],
@@ -113,7 +107,7 @@ function boot(root) {
 
             const area = document.createElement('textarea');
             area.className = 'field resize-none pr-8';
-            area.rows = 3;
+            area.rows = 4;
             area.value = note;
             area.placeholder = `Operator note ${index + 1}`;
             area.addEventListener('input', () => (state.notes[index] = area.value));
@@ -468,4 +462,10 @@ function emptyScenario() {
             max_discharge_kwh_per_hour: 50,
         },
     };
+}
+
+const root = document.getElementById('console');
+
+if (root) {
+    boot(root);
 }
