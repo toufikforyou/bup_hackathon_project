@@ -470,7 +470,8 @@ operations console posts to a root-relative path, so it inherits the page's sche
 `GET /` serves a browser console for demonstrating and debugging the pipeline. It is not part of the judged API
 contract and posts to its own internal route.
 
-It shows the ten public sample cases, an editable note and battery panel, live `/health` state, the resulting
+It shows the ten public sample cases, an editable note panel, range sliders for the battery limits (the initial-energy
+and minimum-energy bounds follow capacity, so an impossible battery cannot be dialled in), live `/health` state, the resulting
 interpretation with a per-note match indicator against the public reference, the 24-hour plan as a chart or a table,
 the battery state-of-charge trace against its active reserve floor, the replay verification result, and the raw API
 response.
@@ -482,9 +483,9 @@ invent a correlation that is not in the data. Every hour carries a hover and key
 validated for colour-vision deficiency and contrast in both themes, a legend is always present, and the **table view is
 the WCAG-clean twin** so no value is reachable only by hovering.
 
-**Theme.** A navy control-room dark theme is the default, with a light theme alongside it. Each has its own set of
-series steps chosen for that surface, not an inverted copy, and both were re-validated against the surface they
-actually render on. The toggle persists to `localStorage`.
+**Theme.** A single light theme with a blue primary. The series palette is validated against the exact card surface it
+renders on: the three stacked series clear the lightness, chroma, colour-vision-deficiency and normal-vision gates, and
+the sub-3:1 contrast warning on two of them is answered by the always-available table view.
 
 **Default state.** The console runs the first public sample automatically on load, so it opens on a finished plan
 rather than an empty placeholder.
