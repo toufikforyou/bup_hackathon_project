@@ -1,0 +1,13 @@
+services:
+  gridwise:
+    build: .
+    image: gridwise-llm:local
+    ports:
+      - "8080:8080"
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      GRIDWISE_LLM_DRIVER: ${GRIDWISE_LLM_DRIVER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+    restart: unless-stopped
