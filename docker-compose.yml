@@ -1,60 +1,47 @@
-# =============================================================================
-# docker-compose.yml — local & VM production orchestration.
-#
-# The app runs in ONE container using the FrankenPHP image
-# (dunglas/frankenphp:1-php8.4-alpine) listening on :8080 inside the container.
-# Port 8080 is published to host port 127.0.0.1:8080 — only nginx should reach
-# it (see deploy/nginx-hackathon.conf), never the public internet.
-#
-# On the host, nginx terminates TLS on 80/443 with a Let's Encrypt cert
-# (see deploy/certbot-init.sh) and reverse-proxies to 127.0.0.1:8080.
-#
-# Usage:
-#   docker compose build           # build the image locally on the VM
-#   docker compose up -d           # start in background
-#   docker compose logs -f gridoptima
-#   docker compose restart gridoptima
-# =============================================================================
-
 services:
-  gridoptima:
-    build: .
-    image: gridoptima:local
-    container_name: gridoptima
+    gridoptima:
+        build: .
+        image: gridoptima:local
+        container_name: gridoptima
 
-    # Only bind to loopback so nginx (on the host) can reach it.
-    # If you ever need public access directly to the app (skipping nginx),
-    # change to "8080:8080" temporarily.
-    ports:
-      - "127.0.0.1:8080:8080"
+        # IP-only HTTP mode: bind container :8080 to host :80 directly (no nginx).
+        # Comment out the next line and uncomment the loopback one if you put
+        # nginx/certbot in front of this later.
+        ports:
+            - "80:8080"
+        # ports:
+        #   - "127.0.0.1:8080:8080"
 
-    env_file:
-      - .env.production
+        env_file:
+            - .env.production
 
-    environment:
-      APP_ENV: production
-      APP_DEBUG: "false"
-      GRIDWISE_LLM_DRIVER: ${GRIDWISE_LLM_DRIVER:-gemini}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
+        environment:
+            APP_ENV: production
+            APP_DEBUG: "false"
+            GRIDWISE_LLM_DRIVER: ${GRIDWISE_LLM_DRIVER:-gemini}
+            GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+            GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.5-flash}
 
-    # Persistent volumes — survive `docker compose down`.
-    volumes:
-      - gridoptima_storage:/var/www/html/storage
-      - gridoptima_db:/var/www/html/database
+        # Persistent volumes — survive `docker compose down`.
+        volumes:
+            - gridoptima_storage:/var/www/html/storage
+            - gridoptima_db:/var/www/html/database
 
-    restart: unless-stopped
+        restart: unless-stopped
 
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
+        healthcheck:
+            test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
+            # Disabled because we publish :80 directly, the health probe could
+            # conflict if the host already has an nginx on :80. Safe to re-enable.
+            disable: true
+            interval: 30s
+            timeout: 5s
+            retries: 3
+            start_period: 30s
 
-    security_opt:
-      - no-new-privileges:true
+        security_opt:
+            - no-new-privileges:true
 
 volumes:
-  gridoptima_storage:
-  gridoptima_db:
+    gridoptima_storage:
+    gridoptima_db:
