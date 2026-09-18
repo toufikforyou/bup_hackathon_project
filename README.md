@@ -24,11 +24,12 @@ operator notes ──▶ LLM (structured JSON) ──▶ deterministic guardrail
 8. [Configuration](#configuration)
 9. [Testing](#testing)
 10. [Docker](#docker)
-11. [Running behind a proxy or tunnel](#running-behind-a-proxy-or-tunnel)
-12. [Operations console](#operations-console)
-13. [Dependencies and credits](#dependencies-and-credits)
-14. [Known limitations](#known-limitations)
-15. [Secret handling](#secret-handling)
+11. [Deployment checklist](#deployment-checklist)
+12. [Running behind a proxy or tunnel](#running-behind-a-proxy-or-tunnel)
+13. [Operations console](#operations-console)
+14. [Dependencies and credits](#dependencies-and-credits)
+15. [Known limitations](#known-limitations)
+16. [Secret handling](#secret-handling)
 
 ---
 
@@ -431,6 +432,31 @@ supplied, caches config/routes/views at start-up and ships with a `HEALTHCHECK` 
 baked into the image** — they are supplied with `-e` at run time.
 
 `docker-compose.yml` is provided for the same thing with an `.env` file.
+
+---
+
+## Deployment checklist
+
+Before the endpoint is reachable by anyone else:
+
+```bash
+APP_ENV=production
+APP_DEBUG=false          # never true on a reachable deployment
+APP_URL=https://your-domain.example
+TRUSTED_PROXIES=*
+GEMINI_API_KEY=...
+```
+
+```bash
+php artisan config:cache
+php artisan route:cache
+php artisan view:cache
+```
+
+`APP_DEBUG=true` makes Laravel render full stack traces and `vendor/...` paths on any error, which counts as exposing
+sensitive values. The judged paths (`/health`, `/optimize-energy`) and the console path are hardened to answer with
+plain JSON regardless of the setting - a test asserts no trace leaks even with debug forced on - but the environment
+variable is still the primary control and must be `false`.
 
 ---
 

@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 $isApiRequest = static fn (Request $request): bool => $request->expectsJson()
-    || $request->is('health', 'optimize-energy', 'api/*');
+    || $request->is('health', 'optimize-energy', 'api/*', 'console/*');
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -44,10 +44,19 @@ return Application::configure(basePath: dirname(__DIR__))
                 $status = $exception->getStatusCode();
 
                 return new JsonResponse([
-                    'error' => $status === 404 ? 'not_found' : 'request_rejected',
-                    'message' => $status === 404
-                        ? 'Unknown endpoint.'
-                        : 'The request could not be processed.',
+                    'error' => match ($status) {
+                        404 => 'not_found',
+                        405 => 'method_not_allowed',
+                        419 => 'session_expired',
+                        429 => 'too_many_requests',
+                        default => 'request_rejected',
+                    },
+                    'message' => match ($status) {
+                        404 => 'Unknown endpoint.',
+                        405 => 'This endpoint does not accept that HTTP method.',
+                        419 => 'The session token has expired. Reload the page and try again.',
+                        default => 'The request could not be processed.',
+                    },
                 ], $status);
             }
 
