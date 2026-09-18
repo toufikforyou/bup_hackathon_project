@@ -1,4 +1,4 @@
-import { createTooltip, renderEnergyChart, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
+import { createTooltip, renderEnergyChart, renderGauge, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
 
 const DIRECTIVE_META = {
     solar_reduction: ['var(--series-solar)', 'Solar reduction'],
@@ -47,8 +47,9 @@ function boot(root) {
 
     for (const id of [
         'sample-list', 'sample-count', 'note-list', 'add-note', 'battery-fields', 'run', 'run-label',
-        'empty-state', 'output', 'hero-value', 'hero-delta', 'stats', 'directives', 'interpretation-source',
+        'empty-state', 'output', 'hero-value', 'hero-delta', 'directives', 'interpretation-source',
         'legend', 'energy-chart', 'tariff-chart', 'soc-chart', 'soc-note', 'replay', 'replay-badge',
+        'gauges', 'mix-bar', 'mix-rows', 'mix-total',
         'raw-json', 'copy-json', 'plan-table', 'view-chart', 'view-table', 'theme-toggle',
     ]) {
         ui[id] = document.getElementById(id);
@@ -62,6 +63,7 @@ function boot(root) {
     paintBattery();
     paintLegend();
     setupViewTabs();
+    run();
 
     ui['add-note'].addEventListener('click', () => {
         if (state.notes.length >= 3) return;
@@ -325,6 +327,7 @@ function boot(root) {
 
     function showError(message) {
         ui['empty-state'].classList.remove('hidden');
+        ui['empty-state'].classList.add('grid');
         ui.output.classList.add('hidden');
         ui.output.classList.remove('flex');
         ui['empty-state'].replaceChildren();
@@ -348,6 +351,7 @@ function boot(root) {
 
     function paintResults(response, diagnostics, payload) {
         ui['empty-state'].classList.add('hidden');
+        ui['empty-state'].classList.remove('grid');
         ui.output.classList.remove('hidden');
         ui.output.classList.add('flex');
 
@@ -357,7 +361,8 @@ function boot(root) {
             : null;
 
         paintHero(response, reference);
-        paintStats(response, diagnostics);
+        paintGauges(response, diagnostics, payload);
+        paintMix(response);
         paintDirectives(response.directive_interpretation, reference);
         paintSource(diagnostics.interpretation);
         drawCharts(response, diagnostics, payload);
@@ -388,53 +393,123 @@ function boot(root) {
         ui['hero-delta'].appendChild(badge);
     }
 
-    function paintStats(response, diagnostics) {
-        const peak = response.hourly_plan.reduce(
-            (best, entry) => (entry.grid_kwh > best.grid_kwh ? entry : best),
-            response.hourly_plan[0],
-        );
+    function paintGauges(response, diagnostics, payload) {
+        const baseline = payload.hours.reduce((sum, h) => sum + h.demand_kwh * h.tariff_bdt_per_kwh, 0);
+        const saved = baseline > 0 ? 1 - response.total_cost_bdt / baseline : 0;
 
-        const applied = response.directive_interpretation.filter((entry) => entry.applies).length;
+        const availableSolar = diagnostics.constraints.effective_solar_kwh.reduce((sum, v) => sum + v, 0);
+        const usedSolar = response.hourly_plan.reduce((sum, p) => sum + p.solar_used_kwh, 0);
+        const captured = availableSolar > 0 ? usedSolar / availableSolar : 1;
+
+        const budget = 5000;
+        const latency = diagnostics.total_latency_ms;
+        const headroom = Math.max(0, 1 - latency / budget);
 
         const cards = [
-            ['Grid import', response.total_grid_kwh, 'kWh', 'bought across 24 hours'],
-            ['Peak hour', response.peak_grid_kwh, 'kWh', `highest single hour is ${String(peak.hour).padStart(2, '0')}:00`],
-            ['Pipeline', diagnostics.total_latency_ms, 'ms', `${applied} of ${response.directive_interpretation.length} notes applied`],
+            {
+                label: 'Cost avoided',
+                value: `${(saved * 100).toFixed(1)}%`,
+                note: `vs ${formatNumber(baseline)} BDT buying every kWh from the grid`,
+                ratio: saved,
+                color: 'var(--status-good)',
+            },
+            {
+                label: 'Solar captured',
+                value: `${(captured * 100).toFixed(1)}%`,
+                note: `${formatNumber(usedSolar)} of ${formatNumber(availableSolar)} kWh available`,
+                ratio: captured,
+                color: 'var(--series-solar)',
+            },
+            {
+                label: 'Pipeline latency',
+                value: `${formatNumber(latency)} ms`,
+                note: latency <= budget ? 'inside the 5 s scoring budget' : 'over the 5 s scoring budget',
+                ratio: headroom,
+                color: latency <= budget ? 'var(--accent)' : 'var(--status-critical)',
+            },
         ];
 
-        ui.stats.replaceChildren();
+        ui.gauges.replaceChildren();
 
-        cards.forEach(([labelText, value, unit, note], index) => {
-            const card = document.createElement('div');
-            card.className = 'card flex flex-col justify-between p-4';
+        cards.forEach((card, index) => {
+            const node = document.createElement('div');
+            node.className = 'card card-lift flex flex-col justify-between p-5';
 
             if (!reducedMotion()) {
-                card.classList.add('rise');
-                card.style.animationDelay = `${60 + index * 60}ms`;
+                node.classList.add('rise');
+                node.style.animationDelay = `${80 + index * 70}ms`;
             }
 
             const caption = document.createElement('p');
             caption.className = 'eyebrow';
-            caption.textContent = labelText;
+            caption.textContent = card.label;
 
-            const figure = document.createElement('p');
-            figure.className = 'stat-value mt-1.5';
+            const meter = document.createElement('div');
+            meter.className = 'mt-2 w-full';
 
-            const suffix = document.createElement('span');
-            suffix.className = 'ml-1 text-[12px] font-normal';
-            suffix.style.color = 'var(--text-muted)';
-            suffix.textContent = unit;
+            const note = document.createElement('p');
+            note.className = 'mt-3 text-[11.5px] leading-snug';
+            note.style.color = 'var(--text-muted)';
+            note.textContent = card.note;
 
-            const footnote = document.createElement('p');
-            footnote.className = 'mt-2 text-[11.5px] leading-snug';
-            footnote.style.color = 'var(--text-muted)';
-            footnote.textContent = note;
+            node.append(caption, meter, note);
+            ui.gauges.appendChild(node);
 
-            card.append(caption, figure, footnote);
-            ui.stats.appendChild(card);
-
-            countUp(figure, value, suffix);
+            renderGauge(meter, { ratio: card.ratio, color: card.color, valueText: card.value });
         });
+    }
+
+    function paintMix(response) {
+        const solar = response.hourly_plan.reduce((sum, p) => sum + p.solar_used_kwh, 0);
+        const discharge = response.hourly_plan.reduce(
+            (sum, p) => sum + (p.battery_action === 'discharge' ? p.battery_kwh : 0),
+            0,
+        );
+        const grid = response.total_grid_kwh;
+        const total = solar + discharge + grid;
+
+        ui['mix-total'].textContent = `${formatNumber(total)} kWh supplied`;
+
+        const parts = [
+            ['Solar used', solar, SERIES_META.solar.color],
+            ['Battery discharge', discharge, SERIES_META.battery.color],
+            ['Grid import', grid, SERIES_META.grid.color],
+        ];
+
+        ui['mix-bar'].replaceChildren();
+        ui['mix-rows'].replaceChildren();
+
+        for (const [name, value, color] of parts) {
+            const segment = document.createElement('span');
+            segment.style.background = color;
+            segment.style.flexGrow = String(Math.max(value, 0));
+            segment.style.flexBasis = '0';
+            ui['mix-bar'].appendChild(segment);
+
+            const row = document.createElement('div');
+            row.className = 'mix-row';
+
+            const key = document.createElement('span');
+            key.className = 'swatch-line';
+            key.style.background = color;
+
+            const text = document.createElement('span');
+            text.className = 'flex-1';
+            text.style.color = 'var(--text-secondary)';
+            text.textContent = name;
+
+            const share = document.createElement('span');
+            share.className = 'tabular-nums';
+            share.style.color = 'var(--text-muted)';
+            share.textContent = total > 0 ? `${((value / total) * 100).toFixed(1)}%` : '—';
+
+            const amount = document.createElement('span');
+            amount.className = 'w-24 text-right font-semibold tabular-nums';
+            amount.textContent = `${formatNumber(value)} kWh`;
+
+            row.append(key, text, share, amount);
+            ui['mix-rows'].appendChild(row);
+        }
     }
 
     function paintDirectives(entries, reference) {

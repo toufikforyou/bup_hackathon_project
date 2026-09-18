@@ -482,8 +482,12 @@ invent a correlation that is not in the data. Every hour carries a hover and key
 validated for colour-vision deficiency and contrast in both themes, a legend is always present, and the **table view is
 the WCAG-clean twin** so no value is reachable only by hovering.
 
-**Theme.** Light and dark are both first-class: the dark palette is its own set of steps chosen for the dark surface,
-not an inverted copy. The toggle persists to `localStorage` and falls back to the OS setting.
+**Theme.** A navy control-room dark theme is the default, with a light theme alongside it. Each has its own set of
+series steps chosen for that surface, not an inverted copy, and both were re-validated against the surface they
+actually render on. The toggle persists to `localStorage`.
+
+**Default state.** The console runs the first public sample automatically on load, so it opens on a finished plan
+rather than an empty placeholder.
 
 **Motion.** Entrance staggers, column growth, line draw-on and value count-ups are all suppressed under
 `prefers-reduced-motion: reduce`.
