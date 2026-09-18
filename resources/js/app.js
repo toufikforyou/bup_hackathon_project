@@ -64,6 +64,7 @@ function boot(root) {
     paintBattery();
     paintLegend();
     setupViewTabs();
+    setupSectionNav();
     run();
 
     ui['add-note'].addEventListener('click', () => {
@@ -85,6 +86,49 @@ function boot(root) {
 
         setTimeout(() => (ui['copy-json'].textContent = 'Copy JSON'), 1500);
     });
+
+    function setupSectionNav() {
+        const pills = [...document.querySelectorAll('.nav-pill')];
+
+        if (pills.length === 0) return;
+
+        const sections = new Map();
+
+        for (const pill of pills) {
+            const section = document.querySelector(pill.getAttribute('href'));
+
+            if (section) sections.set(section, pill);
+
+            pill.addEventListener('click', () => select(pill));
+        }
+
+        const select = (active) => {
+            for (const pill of pills) {
+                if (active === pill) {
+                    pill.setAttribute('aria-current', 'true');
+                } else {
+                    pill.removeAttribute('aria-current');
+                }
+            }
+        };
+
+        if (sections.size === 0) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visible = entries
+                    .filter((entry) => entry.isIntersecting)
+                    .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+
+                if (visible.length > 0) select(sections.get(visible[0].target));
+            },
+            { rootMargin: '-96px 0px -60% 0px', threshold: 0 },
+        );
+
+        for (const section of sections.keys()) {
+            observer.observe(section);
+        }
+    }
 
     function setupViewTabs() {
         for (const tab of document.querySelectorAll('[data-view]')) {
