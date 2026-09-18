@@ -6,6 +6,7 @@ node_modules
 vendor
 public/build
 public/hot
+bootstrap/cache/*.php
 storage/logs/*
 storage/framework/cache/data/*
 storage/framework/sessions/*
@@ -14,5 +15,6 @@ database/database.sqlite
 ProblemStatement
 tests
 .phpunit.result.cache
+docker-compose.yml
 *.md
 !README.md
