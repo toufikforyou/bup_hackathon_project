@@ -27,6 +27,7 @@ ENV APP_ENV=production \
     QUEUE_CONNECTION=sync \
     DB_CONNECTION=sqlite \
     SERVER_NAME=:8080 \
+    TRUSTED_PROXIES=* \
     GRIDWISE_LLM_DRIVER=gemini
 
 RUN install-php-extensions opcache pcntl zip
