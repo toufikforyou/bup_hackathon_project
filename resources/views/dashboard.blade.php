@@ -4,8 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="description" content="LLM-assisted operator directive interpretation and 24-hour campus energy optimisation.">
-    <title>GridWise · Energy Operations Console</title>
+    <meta name="description" content="GridOptima reads campus operator notes with a language model, validates them behind deterministic guardrails and returns a provably cost-optimal 24-hour energy schedule.">
+    <title>GridOptima — Smarter Energy, Optimized for Every Hour</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen font-sans">
@@ -21,14 +21,15 @@
     <header class="sticky top-0 z-40 border-b" style="border-color: var(--border); background: color-mix(in oklab, var(--plane) 86%, transparent); backdrop-filter: blur(14px);">
         <div class="mx-auto flex max-w-[1640px] flex-wrap items-center justify-between gap-4 px-5 py-4 sm:px-8">
             <div class="flex items-center gap-3.5">
-                <span class="grid h-10 w-10 place-items-center rounded-xl" style="background: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 20px -8px var(--accent);">
-                    <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z"/>
+                <span class="brand-mark" aria-hidden="true">
+                    <svg viewBox="0 0 28 28" class="h-[22px] w-[22px]" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M4 22V15M11 22V9M18 22V13M25 22V5" opacity="0.45"/>
+                        <path d="M15.5 2 7 15.5h6l-1 10.5L20.5 12H14l1.5-10Z" fill="currentColor" stroke="none"/>
                     </svg>
                 </span>
                 <div>
-                    <h1 class="text-base font-semibold leading-tight tracking-tight">GridWise</h1>
-                    <p class="text-[11.5px]" style="color: var(--text-muted)">Smart campus energy optimisation</p>
+                    <h1 class="brand-word">Grid<span>Optima</span></h1>
+                    <p class="brand-tagline">Smarter Energy, Optimized for Every Hour.</p>
                 </div>
             </div>
 
