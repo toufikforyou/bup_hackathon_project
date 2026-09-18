@@ -1,4 +1,4 @@
-import { createTooltip, renderEnergyChart, renderGauge, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
+import { createTooltip, renderEnergyChart, renderSocChart, renderTariffChart, SERIES_META } from './charts.js';
 
 const DIRECTIVE_META = {
     solar_reduction: ['var(--series-solar)', 'Solar reduction'],
@@ -49,7 +49,7 @@ function boot(root) {
         'sample-list', 'sample-count', 'note-list', 'add-note', 'battery-fields', 'run', 'run-label',
         'empty-state', 'output', 'hero-value', 'hero-delta', 'directives', 'interpretation-source',
         'legend', 'energy-chart', 'tariff-chart', 'soc-chart', 'soc-note', 'replay', 'replay-badge',
-        'gauges', 'mix-bar', 'mix-rows', 'mix-total',
+        'metrics', 'mix-bar', 'mix-rows', 'mix-total',
         'raw-json', 'copy-json', 'plan-table', 'view-chart', 'view-table',
     ]) {
         ui[id] = document.getElementById(id);
@@ -385,7 +385,7 @@ function boot(root) {
             : null;
 
         paintHero(response, reference);
-        paintGauges(response, diagnostics, payload);
+        paintMetrics(response, diagnostics, payload);
         paintMix(response);
         paintDirectives(response.directive_interpretation, reference);
         paintSource(diagnostics.interpretation);
@@ -417,7 +417,7 @@ function boot(root) {
         ui['hero-delta'].appendChild(badge);
     }
 
-    function paintGauges(response, diagnostics, payload) {
+    function paintMetrics(response, diagnostics, payload) {
         const baseline = payload.hours.reduce((sum, h) => sum + h.demand_kwh * h.tariff_bdt_per_kwh, 0);
         const saved = baseline > 0 ? 1 - response.total_cost_bdt / baseline : 0;
 
@@ -427,59 +427,82 @@ function boot(root) {
 
         const budget = 5000;
         const latency = diagnostics.total_latency_ms;
-        const headroom = Math.max(0, 1 - latency / budget);
 
-        const cards = [
+        const metrics = [
             {
                 label: 'Cost avoided',
-                value: `${(saved * 100).toFixed(1)}%`,
-                note: `vs ${formatNumber(baseline)} BDT buying every kWh from the grid`,
+                value: (saved * 100).toFixed(1),
+                unit: '%',
                 ratio: saved,
                 color: 'var(--status-good)',
+                note: `vs ${formatCompact(baseline)} BDT at full grid supply`,
             },
             {
                 label: 'Solar captured',
-                value: `${(captured * 100).toFixed(1)}%`,
-                note: `${formatNumber(usedSolar)} of ${formatNumber(availableSolar)} kWh available`,
+                value: (captured * 100).toFixed(1),
+                unit: '%',
                 ratio: captured,
                 color: 'var(--series-solar)',
+                note: `${formatCompact(usedSolar)} of ${formatCompact(availableSolar)} kWh available`,
             },
             {
-                label: 'Pipeline latency',
-                value: `${formatNumber(latency)} ms`,
-                note: latency <= budget ? 'inside the 5 s scoring budget' : 'over the 5 s scoring budget',
-                ratio: headroom,
-                color: latency <= budget ? 'var(--accent)' : 'var(--status-critical)',
+                label: 'Pipeline',
+                value: latency >= 1000 ? (latency / 1000).toFixed(1) : Math.round(latency).toString(),
+                unit: latency >= 1000 ? 's' : 'ms',
+                ratio: Math.min(1, latency / budget),
+                color: latencyColor(latency / budget),
+                note: latency <= budget ? 'within the 5 s budget' : 'over the 5 s budget',
             },
         ];
 
-        ui.gauges.replaceChildren();
+        ui.metrics.replaceChildren();
 
-        cards.forEach((card, index) => {
-            const node = document.createElement('div');
-            node.className = 'card card-lift flex flex-col justify-between p-5';
+        metrics.forEach((metric, index) => {
+            const cell = document.createElement('div');
+            cell.className = 'metric flex flex-col justify-between';
 
             if (!reducedMotion()) {
-                node.classList.add('rise');
-                node.style.animationDelay = `${80 + index * 70}ms`;
+                cell.classList.add('rise');
+                cell.style.animationDelay = `${90 + index * 70}ms`;
             }
 
             const caption = document.createElement('p');
             caption.className = 'eyebrow';
-            caption.textContent = card.label;
+            caption.textContent = metric.label;
 
-            const meter = document.createElement('div');
-            meter.className = 'mt-2 w-full';
+            const figure = document.createElement('p');
+            figure.className = 'metric-value mt-2.5';
+            figure.textContent = metric.value;
+
+            const unit = document.createElement('span');
+            unit.className = 'metric-unit';
+            unit.textContent = metric.unit;
+            figure.appendChild(unit);
+
+            const track = document.createElement('div');
+            track.className = 'meter mt-4';
+            track.style.background = `color-mix(in oklab, ${metric.color} 16%, transparent)`;
+            track.setAttribute('role', 'img');
+            track.setAttribute('aria-label', `${metric.label}: ${metric.value}${metric.unit}`);
+
+            const fill = document.createElement('span');
+            fill.style.background = metric.color;
+            fill.style.width = reducedMotion() ? `${Math.min(100, metric.ratio * 100)}%` : '0%';
+            track.appendChild(fill);
 
             const note = document.createElement('p');
-            note.className = 'mt-3 text-[11.5px] leading-snug';
+            note.className = 'mt-2.5 text-[11.5px] leading-snug';
             note.style.color = 'var(--text-muted)';
-            note.textContent = card.note;
+            note.textContent = metric.note;
 
-            node.append(caption, meter, note);
-            ui.gauges.appendChild(node);
+            cell.append(caption, figure, track, note);
+            ui.metrics.appendChild(cell);
 
-            renderGauge(meter, { ratio: card.ratio, color: card.color, valueText: card.value });
+            if (!reducedMotion()) {
+                requestAnimationFrame(() => {
+                    fill.style.width = `${Math.min(100, metric.ratio * 100)}%`;
+                });
+            }
         });
     }
 
@@ -832,6 +855,23 @@ function fillPercent(value, bounds) {
     const span = bounds.max - bounds.min;
 
     return `${span > 0 ? ((value - bounds.min) / span) * 100 : 0}%`;
+}
+
+function latencyColor(share) {
+    if (share > 1) return 'var(--status-critical)';
+    if (share > 0.6) return 'var(--status-warning)';
+
+    return 'var(--accent)';
+}
+
+function formatCompact(value) {
+    const n = Number(value);
+
+    if (Math.abs(n) >= 1000) {
+        return `${(n / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 })}k`;
+    }
+
+    return formatNumber(n);
 }
 
 function formatNumber(value) {

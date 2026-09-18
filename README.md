@@ -396,7 +396,7 @@ judging.
 ## Testing
 
 ```bash
-php artisan test          # 55 tests
+php artisan test          # 58 tests
 ./vendor/bin/pint --test  # code style
 php artisan gridwise:samples
 ```
@@ -512,6 +512,11 @@ the WCAG-clean twin** so no value is reachable only by hovering.
 **Theme.** A single light theme with a blue primary. The series palette is validated against the exact card surface it
 renders on: the three stacked series clear the lightness, chroma, colour-vision-deficiency and normal-vision gates, and
 the sub-3:1 contrast warning on two of them is answered by the always-available table view.
+
+**Overview.** One card carries the hero figure and three supporting metrics separated by hairlines, each with a thin
+linear meter rather than a boxed gauge: cost avoided against a full-grid-supply baseline, solar captured against what
+was actually available, and pipeline time against the 5 s scoring budget, whose meter shifts from accent to warning to
+critical as it fills.
 
 **Default state.** The console runs the first public sample automatically on load, so it opens on a finished plan
 rather than an empty placeholder.
