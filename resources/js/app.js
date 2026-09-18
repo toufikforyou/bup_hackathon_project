@@ -9,12 +9,12 @@ const DIRECTIVE_META = {
     no_op: ['var(--text-muted)', 'No operation'],
 };
 
-const BATTERY_FIELDS = [
-    ['capacity_kwh', 'Capacity'],
-    ['initial_energy_kwh', 'Initial energy'],
-    ['minimum_energy_kwh', 'Minimum energy'],
-    ['max_charge_kwh_per_hour', 'Max charge / h'],
-    ['max_discharge_kwh_per_hour', 'Max discharge / h'],
+const BATTERY_SLIDERS = [
+    { key: 'capacity_kwh', label: 'Capacity', unit: 'kWh', min: 50, max: 1000, step: 10 },
+    { key: 'initial_energy_kwh', label: 'Initial energy', unit: 'kWh', min: 0, step: 5 },
+    { key: 'minimum_energy_kwh', label: 'Minimum energy', unit: 'kWh', min: 0, step: 5 },
+    { key: 'max_charge_kwh_per_hour', label: 'Max charge per hour', unit: 'kWh', min: 0, max: 300, step: 5 },
+    { key: 'max_discharge_kwh_per_hour', label: 'Max discharge per hour', unit: 'kWh', min: 0, max: 300, step: 5 },
 ];
 
 const REPLAY_CHECKS = [
@@ -50,12 +50,11 @@ function boot(root) {
         'empty-state', 'output', 'hero-value', 'hero-delta', 'directives', 'interpretation-source',
         'legend', 'energy-chart', 'tariff-chart', 'soc-chart', 'soc-note', 'replay', 'replay-badge',
         'gauges', 'mix-bar', 'mix-rows', 'mix-total',
-        'raw-json', 'copy-json', 'plan-table', 'view-chart', 'view-table', 'theme-toggle',
+        'raw-json', 'copy-json', 'plan-table', 'view-chart', 'view-table',
     ]) {
         ui[id] = document.getElementById(id);
     }
 
-    setupTheme(ui['theme-toggle']);
     checkHealth();
     paintProvider(provider);
     paintSamples();
@@ -84,35 +83,6 @@ function boot(root) {
 
         setTimeout(() => (ui['copy-json'].textContent = 'Copy JSON'), 1500);
     });
-
-    function setupTheme(button) {
-        const apply = (theme) => {
-            document.documentElement.dataset.theme = theme;
-
-            try {
-                localStorage.setItem('gridwise-theme', theme);
-            } catch {
-                /* storage unavailable */
-            }
-
-            const dark = theme === 'dark';
-            button.querySelector('[data-icon="sun"]').classList.toggle('hidden', !dark);
-            button.querySelector('[data-icon="moon"]').classList.toggle('hidden', dark);
-        };
-
-        const current = document.documentElement.dataset.theme
-            || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-
-        apply(current);
-
-        button.addEventListener('click', () => {
-            apply(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-
-            if (state.last) {
-                drawCharts(state.last.response, state.last.diagnostics, state.last.payload);
-            }
-        });
-    }
 
     function setupViewTabs() {
         for (const tab of document.querySelectorAll('[data-view]')) {
@@ -201,30 +171,84 @@ function boot(root) {
         ui['add-note'].disabled = state.notes.length >= 3;
     }
 
+    function batteryBounds(slider) {
+        const battery = state.scenario.battery;
+
+        if (slider.key === 'initial_energy_kwh') {
+            return { min: battery.minimum_energy_kwh, max: battery.capacity_kwh };
+        }
+
+        if (slider.key === 'minimum_energy_kwh') {
+            return { min: 0, max: battery.capacity_kwh };
+        }
+
+        return { min: slider.min, max: slider.max };
+    }
+
+    function reconcileBattery() {
+        const battery = state.scenario.battery;
+
+        battery.minimum_energy_kwh = Math.min(battery.minimum_energy_kwh, battery.capacity_kwh);
+        battery.initial_energy_kwh = Math.min(
+            battery.capacity_kwh,
+            Math.max(battery.initial_energy_kwh, battery.minimum_energy_kwh),
+        );
+    }
+
     function paintBattery() {
+        reconcileBattery();
         ui['battery-fields'].replaceChildren();
 
-        for (const [key, text] of BATTERY_FIELDS) {
-            const wrapper = document.createElement('label');
-            wrapper.className = 'block space-y-1';
+        for (const slider of BATTERY_SLIDERS) {
+            const bounds = batteryBounds(slider);
+            const value = state.scenario.battery[slider.key];
 
-            const caption = document.createElement('span');
-            caption.className = 'block text-[11px]';
-            caption.style.color = 'var(--text-muted)';
-            caption.textContent = text;
+            const row = document.createElement('div');
+            row.className = 'slider-row';
+
+            const head = document.createElement('div');
+            head.className = 'slider-head';
+
+            const label = document.createElement('label');
+            label.className = 'slider-label';
+            label.setAttribute('for', `battery-${slider.key}`);
+            label.textContent = slider.label;
+
+            const readout = document.createElement('span');
+            readout.className = 'slider-value';
+            readout.textContent = formatNumber(value);
+
+            const unit = document.createElement('span');
+            unit.textContent = slider.unit;
+            readout.appendChild(unit);
+
+            head.append(label, readout);
 
             const input = document.createElement('input');
-            input.type = 'number';
-            input.className = 'field';
-            input.step = 'any';
-            input.min = '0';
-            input.value = state.scenario.battery[key];
+            input.type = 'range';
+            input.className = 'slider';
+            input.id = `battery-${slider.key}`;
+            input.min = String(bounds.min);
+            input.max = String(bounds.max);
+            input.step = String(slider.step);
+            input.value = String(value);
+            input.style.setProperty('--fill', fillPercent(value, bounds));
+
             input.addEventListener('input', () => {
-                state.scenario.battery[key] = Number(input.value);
+                const next = Number(input.value);
+                state.scenario.battery[slider.key] = next;
+
+                readout.replaceChildren(document.createTextNode(formatNumber(next)), unit);
+                input.style.setProperty('--fill', fillPercent(next, bounds));
+
+                if (slider.key === 'capacity_kwh' || slider.key === 'minimum_energy_kwh') {
+                    clearTimeout(state.batteryRepaint);
+                    state.batteryRepaint = setTimeout(paintBattery, 220);
+                }
             });
 
-            wrapper.append(caption, input);
-            ui['battery-fields'].appendChild(wrapper);
+            row.append(head, input);
+            ui['battery-fields'].appendChild(row);
         }
     }
 
@@ -802,6 +826,12 @@ function numericOf(adjustment) {
     }
 
     return null;
+}
+
+function fillPercent(value, bounds) {
+    const span = bounds.max - bounds.min;
+
+    return `${span > 0 ? ((value - bounds.min) / span) * 100 : 0}%`;
 }
 
 function formatNumber(value) {

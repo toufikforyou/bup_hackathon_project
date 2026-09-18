@@ -6,16 +6,6 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="description" content="LLM-assisted operator directive interpretation and 24-hour campus energy optimisation.">
     <title>GridWise · Energy Operations Console</title>
-    <script>
-        (() => {
-            try {
-                const stored = localStorage.getItem('gridwise-theme');
-                if (stored) document.documentElement.dataset.theme = stored;
-            } catch (error) {
-                /* storage unavailable */
-            }
-        })();
-    </script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen font-sans">
@@ -58,15 +48,6 @@
                     <span class="swatch" style="background: var(--accent)"></span>
                     <span id="provider-text">{{ $provider['driver'] }} · {{ $provider['model'] }}</span>
                 </span>
-                <button type="button" class="btn !px-3 !py-2.5" id="theme-toggle" aria-label="Switch colour theme" title="Switch colour theme">
-                    <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-icon="sun">
-                        <circle cx="12" cy="12" r="4"/>
-                        <path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4m0-14.2-1.4 1.4M6.3 17.7l-1.4 1.4"/>
-                    </svg>
-                    <svg viewBox="0 0 24 24" class="hidden h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" data-icon="moon">
-                        <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>
-                    </svg>
-                </button>
             </div>
         </div>
     </header>
@@ -98,7 +79,7 @@
                 <div class="card-head">
                     <span class="card-title">Battery</span>
                 </div>
-                <div class="grid grid-cols-2 gap-3 p-4" id="battery-fields"></div>
+                <div class="space-y-4 p-4" id="battery-fields"></div>
             </section>
 
             <button type="button" class="btn btn-primary sweep w-full !py-3.5 !text-sm" id="run">
