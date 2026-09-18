@@ -1,5 +1,7 @@
 .git
 .github
+.idea
+.vscode
 .env
 .env.*
 node_modules
@@ -14,7 +16,8 @@ storage/framework/views/*
 database/database.sqlite
 ProblemStatement
 tests
+deploy
+docker-compose*.yml
 .phpunit.result.cache
-docker-compose.yml
 *.md
 !README.md
