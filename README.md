@@ -1,8 +1,43 @@
+<div align="center">
+
+<img src="public/favicon.svg" width="88" alt="GridOptima logo" />
+
 # GridOptima
 
 **Smarter Energy, Optimized for Every Hour.**
 
 Smart Campus Energy Optimization Challenge · BUP CSE Fest 2026 Hackathon · Online Preliminary
+
+[![PHP 8.3+](https://img.shields.io/badge/PHP-8.3%2B-777BB4?logo=php&logoColor=white)](#quickstart)
+[![Laravel 13](https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white)](https://laravel.com)
+[![Gemini](https://img.shields.io/badge/LLM-Gemini%20%7C%20OpenAI%20%7C%20Groq%20%7C%20Claude%20%7C%20Ollama-4285F4)](#configuration)
+[![Tailwind CSS 4](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white)](#operations-console)
+[![Docker](https://img.shields.io/badge/Docker-FrankenPHP-2496ED?logo=docker&logoColor=white)](#docker)
+
+[Quickstart](#quickstart) · [How it works](#architecture) · [Operations console](#operations-console) · [Known limitations](#known-limitations)
+
+</div>
+
+---
+
+## In plain words
+
+A campus runs on solar panels, a battery and the city grid, and grid power costs more at some hours than others.
+Every day an operator writes notes like *"keep at least 40% in the battery overnight"*, *"panels are being cleaned
+around noon"* or *"go easy on the grid during the evening peak"*.
+
+GridOptima reads those notes, turns them into exact rules a computer can check, and then works out the **cheapest
+possible 24-hour plan** that obeys every one of them, hour by hour.
+
+The language model only does the part it's good at: understanding the operator's words. Everything after that is
+plain, deterministic math, so the answer is the same every time and can be checked:
+
+- **Guardrails** reject anything the model got wrong, and ask again only for those notes.
+- A **linear-program optimizer**, with a simplex solver written from scratch (no solver library), finds the minimum-cost schedule.
+- A **replay verifier** re-runs the plan hour by hour, the same way the judges do, before it's returned.
+- A browser **operations console** shows the plan, the battery's charge and every check as charts and a table.
+
+## What it does, technically
 
 A single HTTP service that reads free-text campus operator notes with a language model, converts them into
 machine-checkable directives behind deterministic guardrails, and returns a provably cost-optimal, fully valid
@@ -44,8 +79,8 @@ operator notes ──▶ LLM (structured JSON) ──▶ deterministic guardrail
 From a clean machine. Requires **PHP 8.3+**, **Composer 2**, **Node 20+** and **npm**.
 
 ```bash
-git clone <repository-url> gridwise
-cd gridwise
+git clone https://github.com/toufikforyou/bup_hackathon_project.git gridoptima
+cd gridoptima
 
 composer install
 cp .env.example .env
